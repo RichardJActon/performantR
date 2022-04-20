@@ -1,0 +1,244 @@
+---
+title: "Performant R"
+subtitle: "Doing things faster with R"
+author: "Dr. Richard J. Acton"
+institute: "CECAD"
+date: "`r Sys.Date()`"
+output:
+  xaringan::moon_reader:
+    css: [xaringan-themer.css]
+    lib_dir: libs
+    nature:
+      slideNumberFormat: "%current%"
+      highlightStyle: github
+      highlightLines: true
+      ratio: 16:9
+      countIncrementalSlides: true
+---
+
+<style>
+.slug {
+  color: var(--slug_grey);
+  font-size: 0.5em;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  bottom: 0;
+  padding: 2rem 64px 1.5rem 64px;
+}
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  fig.width=9, fig.height=4, fig.retina=2, 
+  out.width="100%",
+  message = FALSE
+)
+
+slug <- paste0(
+	c(
+		"AG Schumacher / Bioinf. Core",
+		rmarkdown::metadata$author,
+		rmarkdown::metadata$institute,
+		format.Date(Sys.Date())
+	),
+	collapse = " | "
+)
+```
+
+```{r xaringanthemer, echo=FALSE}
+library(xaringanthemer)
+
+palette <- c(
+	background_white = "#FFFFFF",
+	general_text_black = "#000000",
+	cecad_blue = "#005B9C",
+	cecad_grey = "#8B8B8B",
+	slug_grey = "#808080"
+	# orange      = "#fb5607",
+	# pink        = "#ff006e",
+	# blue_violet = "#8338ec",
+	# zomp        = "#38A88E",
+	# shadow      = "#87826E"
+)
+
+style_duo_accent(colors = palette)
+```
+
+```{r xaringanExtra, echo=FALSE}
+xaringanExtra::use_xaringan_extra(c("panelset", "scribble"))
+```
+
+# Performant R
+
+- Performance Tips & Tricks
+	- Beware premature optimisation!
+- Coding efficiently !== Writing efficient code
+	- Functional Programming in R
+- Parallel processing with {future}s
+- Caching computationally expensive results
+	- Using pipeline managers {targets}
+
+.slug[`r slug`]
+
+---
+
+# Performancs Tips & Tricks
+
+- Vectorise all the things
+- DON’T Grow vectors
+- Slightly Hacky hash tables
+- Give up and Write C++
+
+- Beware Premature of optimisation!
+- Know Your bottlenecks - profiling
+
+.slug[`r slug`]
+
+---
+
+# Profiling with {Profvis} and RStudio
+
+- Beware Premature of optimisation! (“root of all evil - Knuth”)
+	- Know Your bottlenecks – profiling
+	- Profile your code to see what is taking time (&/or memory)
+	{Profvis}
+	- Rstudio: Profile > Profile Selected Line(s)
+	- https://www.youtube.com/watch?v=rmnee9I2dvk
+
+.slug[`r slug`]
+
+---
+
+# Vectorise all the things
+
+- In R (almost) everything is a vector
+	- Rule of Thumb: vector > loop
+	- Applies to matrices/arrays too
+
+.slug[`r slug`]
+
+---
+
+# DON’T Grow vectors
+
+- Append == BAD
+- If you know the length of your output declare the datastructure you are going to put it in in advance
+
+.slug[`r slug`]
+
+---
+
+# Slightly Hacky hash tables
+
+- hashed
+
+.slug[`r slug`]
+
+---
+
+# Give up and Write C++ - But in R!
+
+- The {Rcpp} library
+
+.slug[`r slug`]
+
+---
+
+# DON	’t do any of the above! - YET
+
+- Don’t prematurely optimise your code until you know what your bottlenecks are or you will waste a lot of time and effort!
+
+- Profiling Your code
+	- Simple run time checks
+	- Rstudio profiling tools
+
+.slug[`r slug`]
+
+---
+
+# ‘Efficienct’ coding is not all about performance
+
+- If future you / future maintainers of your code can’t understand your optimised code to fix it when it breaks is it really efficient?
+- Consider development time as well as execution time.
+
+.slug[`r slug`]
+
+---
+
+# Functional Programming in R
+
+- Good Functions
+	- Referential Transparency (no globals or side effects just params)
+	- Endomorphism (same form as input and output)
+- Map/Reduce
+	- The {purrr} library
+
+.slug[`r slug`]
+
+---
+
+# Functional Programming in R
+
+- Why Write Functions?
+	- Reusable
+	- Testable
+	- Portable
+	- Self-contained
+		- lexical scoping reduces the complexity of the state of the program which often grows very large in imperative style
+
+.slug[`r slug`]
+
+---
+
+# More Power! - Need speed just add threads
+
+- Parallel processing with Futures
+- How not to use all your RAM
+- 
+- Futures as an interface to HPC Schedulers with {future.batchtools}
+- ~BIGstatsR – name? On disc matrices for massive models etc.
+
+.slug[`r slug`]
+
+---
+
+# Parallelism with Futures
+
+- There a variety of ways to do parallel and asyncronous processing in R
+- {future} provides a nice consistent interface to many of them, but may not always be the best choice.
+
+.slug[`r slug`]
+
+---
+
+# Parallelism with Futures
+
+- Coding for futures
+	- {future.apply}
+	- {furrr}
+	- %<-%
+
+.slug[`r slug`]
+
+---
+
+# Parallelism with Futures
+
+- ‘Future plans’
+	- `plan(list(tweak(),tweak()))`
+
+.slug[`r slug`]
+
+---
+
+# How not to use all your RAM
+
+- R likes to copy things into memory, do not pass big objects to subprocesses or you will eat all your RAM
+- Subset first to be safe
+	- Beware of lazy evaluation 
+		- `r emo::ji("smiley")` `function(x[i])`
+		- `r emo::ji("disappointed")` `y <- x[i]; function(y)`
+
+.slug[`r slug`]
+

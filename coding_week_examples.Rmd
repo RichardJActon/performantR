@@ -1,0 +1,251 @@
+---
+title: "Coding Week Examples"
+output: html_notebook
+---
+
+```{r}
+suppressPackageStartupMessages({
+	library(microbenchmark)
+	library(dplyr)
+	library(ggplot2)
+})
+```
+
+# Vectorisation / using optimised built-ins
+
+```{r}
+normal_numbers <- rnorm(100)
+
+bench_res <- dplyr::bind_rows(
+	microbenchmark::microbenchmark(
+		sum(normal_numbers)
+	),
+	
+	microbenchmark::microbenchmark({
+		mysum <- 0
+		for(i in seq_along(normal_numbers)) {
+			mysum <- mysum + normal_numbers[i]
+		}
+	})
+) %>% 
+	dplyr::mutate(
+		name = dplyr::if_else(grepl("mysum", expr), "loop", "sum")
+	) 
+
+bench_res %>%
+	as_tibble() %>%
+	ggplot(aes(name, time)) + 
+		geom_boxplot() +
+		#ggbeeswarm::geom_beeswarm() +
+		ggbeeswarm::geom_quasirandom() +
+		scale_y_log10() + 
+		labs(title = "Comparative Runtimes", y = "time /ns", x = "Condition")
+```
+
+# Growing
+
+```{r}
+n <- 100
+n_bench <- 10000
+object_creation <- dplyr::bind_rows(
+	microbenchmark::microbenchmark({
+		vec <- numeric(0)
+		for(i in 1:n) vec <- c(vec, i)
+	}, times = n_bench),
+	microbenchmark::microbenchmark({
+		vec <- numeric(n)
+		for(i in 1:n) vec[i] <- i
+	}, times = n_bench),
+	microbenchmark::microbenchmark({
+		vec <- 1:n
+	}, times = n_bench)
+) %>%
+	dplyr::mutate(
+		name = dplyr::case_when(
+			grepl("numeric\\(0\\)", expr) ~ "grow",
+			grepl("numeric\\(n\\)", expr) ~ "pre-alocate",
+			TRUE ~ "direct"
+		)
+	)
+
+object_creation %>%
+	as_tibble() %>%
+	ggplot(aes(name, time)) + 
+		geom_boxplot() +
+		#ggbeeswarm::geom_beeswarm() +
+		ggbeeswarm::geom_quasirandom() +
+		scale_y_log10() + 
+		labs(title = "Comparative Runtimes", y = "time /ns", x = "Condition")
+```
+
+# Vectorisation
+
+```{r}
+amat <- matrix(rnorm(10000),nrow = 100)
+
+
+subsetting_vectors <- dplyr::bind_rows(
+	microbenchmark::microbenchmark({
+		bmat <- matrix(NA, nrow(amat)/2, ncol(amat))
+		for(i in 1:nrow(bmat)) bmat[i,] <- amat[2*i-1,] * amat[2*i,]
+	}),
+	microbenchmark::microbenchmark({
+		bmat2 <- amat[seq(1, nrow(amat), by=2),] *
+		amat[seq(2, nrow(amat), by=2),]
+	})
+) %>%
+	dplyr::mutate(
+		name = dplyr::case_when(
+			grepl("bmat2 ", expr) ~ "subsetting, vectorised",
+			grepl("bmat ", expr) ~ "subsetting, loop"
+		)
+	)
+
+#all.equal(bmat, bmat2)
+
+
+subsetting_vectors %>%
+	as_tibble() %>%
+	ggplot(aes(name, time)) + 
+		geom_boxplot() +
+		#ggbeeswarm::geom_beeswarm() +
+		ggbeeswarm::geom_quasirandom() +
+		scale_y_log10() + 
+		labs(title = "Comparative Runtimes", y = "time /ns", x = "Condition")
+
+```
+
+# Hash tables
+
+https://blog.dominodatalab.com/a-quick-benchmark-of-hashtable-implementations-in-r
+
+```{r}
+myenv <- new.env(hash=TRUE) 
+myenv$tmp <- "test"
+
+myenv$tmp
+```
+
+
+```{r}
+set.seed(42)
+n <- 1e5
+values <- 1:n
+keys <- purrr::map_chr(1:n, ~paste0(sample(letters,10), collapse = ""))
+
+named_vec <- values
+names(named_vec) <- keys
+
+named_lst <- as.list(named_vec)
+
+my_env <- new.env(hash=TRUE) 
+purrr::walk2(keys, values, ~{my_env[[.x]] <- .y})
+
+example_key <- keys[10]
+
+find_hash <- dplyr::bind_rows(
+	microbenchmark::microbenchmark({
+		named_vec[example_key]
+	}),
+	microbenchmark::microbenchmark({
+		named_lst[example_key]
+	}),
+	microbenchmark::microbenchmark({
+		my_env[[example_key]]
+	}) %>%
+	dplyr::mutate(
+		name = dplyr::case_when(
+			grepl("named_lst", expr) ~ "named list",
+			grepl("named_vec", expr) ~ "named vector",
+			grepl("my_env", expr) ~ "hash"
+		)
+	)
+)
+
+find_hash
+
+find_hash %>%
+	as_tibble() %>%
+	ggplot(aes(expr, time)) + 
+		geom_boxplot(outlier.shape = NA) +
+		#ggbeeswarm::geom_beeswarm() +
+		ggbeeswarm::geom_quasirandom() +
+		scale_y_log10() + 
+		labs(title = "Comparative Runtimes", y = "time /ns", x = "Condition")
+
+```
+
+## non-member
+
+```{r}
+non_member <- dplyr::bind_rows(
+	microbenchmark::microbenchmark({
+		"not here" %in% named_vec
+	}),
+	microbenchmark::microbenchmark({
+		!is.null(named_lst[["not here"]])
+	}),
+	microbenchmark::microbenchmark({
+		!is.null(my_env[["not here"]])
+	}) %>%
+	dplyr::mutate(
+		name = dplyr::case_when(
+			grepl("named_lst", expr) ~ "named list",
+			grepl("%in%", expr) ~ "named vector",
+			grepl("null", expr) ~ "hash"
+		)
+	)
+)
+
+non_member
+
+non_member %>%
+	as_tibble() %>%
+	ggplot(aes(expr, time)) + 
+		geom_boxplot() +
+		#ggbeeswarm::geom_beeswarm() +
+		ggbeeswarm::geom_quasirandom() +
+		scale_y_log10() + 
+		labs(title = "Comparative Runtimes", y = "time /ns", x = "Condition")
+```
+
+
+## Indexing a data.frame
+
+```{r}
+df <- data.frame(keys = keys, values = values)
+
+
+df_l <- df %>% group_by(keys) %>% dplyr::group_split()
+names(df_l) <- df$keys
+df_index <- new.env(hash = TRUE)
+purrr::walk2(df$keys, df_l, ~{df_index[[.x]] <- .y})
+
+hash_as_index <- dplyr::bind_rows(
+	microbenchmark::microbenchmark({
+		df_index[[example_key]]
+	}),
+	microbenchmark::microbenchmark({
+		df %>% dplyr::filter(keys == example_key)
+	}) %>%
+	dplyr::mutate(
+		name = dplyr::case_when(
+			grepl("filter", expr) ~ "dplyr filter",
+			grepl("df_index", expr) ~ "hash"
+		)
+	)
+)
+
+hash_as_index
+
+
+hash_as_index %>%
+	as_tibble() %>%
+	ggplot(aes(name, time)) + 
+		geom_boxplot() +
+		#ggbeeswarm::geom_beeswarm() +
+		ggbeeswarm::geom_quasirandom() +
+		scale_y_log10() + 
+		labs(title = "Comparative Runtimes", y = "time /ns", x = "Condition")
+```
+
