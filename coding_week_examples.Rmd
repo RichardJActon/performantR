@@ -3,11 +3,15 @@ title: "Coding Week Examples"
 output: html_notebook
 ---
 
+# Packages
+
 ```{r}
 suppressPackageStartupMessages({
 	library(microbenchmark)
 	library(dplyr)
 	library(ggplot2)
+	library(data.table)
+	#library(tictoc)
 })
 ```
 
@@ -15,98 +19,234 @@ suppressPackageStartupMessages({
 
 ```{r}
 normal_numbers <- rnorm(100)
-
-bench_res <- dplyr::bind_rows(
-	microbenchmark::microbenchmark(
-		sum(normal_numbers)
-	),
-	
-	microbenchmark::microbenchmark({
+vec_vs_lp_res <- microbenchmark::microbenchmark(
+	vector = {sum(normal_numbers)},
+	loop = {
 		mysum <- 0
 		for(i in seq_along(normal_numbers)) {
 			mysum <- mysum + normal_numbers[i]
 		}
-	})
-) %>% 
-	dplyr::mutate(
-		name = dplyr::if_else(grepl("mysum", expr), "loop", "sum")
-	) 
+		mysum
+	},
+	times = 100, control = list(order = "block")#inorder
+)
 
-bench_res %>%
-	as_tibble() %>%
-	ggplot(aes(name, time)) + 
+# boxplot(vec_vs_lp_res)
+
+vec_vs_lp_res %>% 
+	tibble::as_tibble() %>%
+	ggplot(aes(expr, time)) + 
 		geom_boxplot() +
 		#ggbeeswarm::geom_beeswarm() +
 		ggbeeswarm::geom_quasirandom() +
 		scale_y_log10() + 
 		labs(title = "Comparative Runtimes", y = "time /ns", x = "Condition")
 ```
+
+# Growing scaling
+
+```{r}
+lengths <- seq(1, 1000, length.out = 10)
+lst <- vector(mode = "list", length = length(lengths))
+for (i in seq_along(lengths)) {
+	n <- lengths[i]
+	lst[[i]] <- microbenchmark::microbenchmark(
+		grow = {
+			vec <- numeric(0)
+			for(i in 1:n) vec <- c(vec, i)
+		},
+		"pre-allocate" = {
+			vec <- numeric(n)
+			for(i in 1:n) vec[i] <- i
+		},
+		direct = {
+			vec <- 1:n
+		},
+		times = 50
+	) %>% 
+		tibble::as_tibble() %>%
+		dplyr::mutate(length = n)
+}
+effect_of_vec_len <- dplyr::bind_rows(lst)
+
+effect_of_vec_len %>%
+	ggplot(., aes(length, time)) +
+	#geom_point(aes(color = expr), size = 0.2) + 
+	scale_y_log10() +
+	#geom_line(aes(color = expr)) + 
+	geom_smooth(
+		aes(color = expr),
+		#method = "lm", formula = "y ~ x"
+		method = "gam", formula = y ~ s(x, bs = "cs")
+	) + 
+	theme_bw() + 
+	labs(
+		title = "Change in runtime with number of iterations",
+		y = "time /ns", color = "Condition",
+		x = "Length of vector"
+	) 
+
+
+```
+
 
 # Growing
 
 ```{r}
 n <- 100
-n_bench <- 10000
-object_creation <- dplyr::bind_rows(
-	microbenchmark::microbenchmark({
+n_bench <- 50
+object_creation <- microbenchmark::microbenchmark(
+	grow = {
 		vec <- numeric(0)
 		for(i in 1:n) vec <- c(vec, i)
-	}, times = n_bench),
-	microbenchmark::microbenchmark({
+	},
+	"pre-allocate" = {
 		vec <- numeric(n)
 		for(i in 1:n) vec[i] <- i
-	}, times = n_bench),
-	microbenchmark::microbenchmark({
+	},
+	direct = {
 		vec <- 1:n
-	}, times = n_bench)
-) %>%
-	dplyr::mutate(
-		name = dplyr::case_when(
-			grepl("numeric\\(0\\)", expr) ~ "grow",
-			grepl("numeric\\(n\\)", expr) ~ "pre-alocate",
-			TRUE ~ "direct"
-		)
-	)
+	},
+	times = n_bench
+)
+
+#boxplot(object_creation)
 
 object_creation %>%
 	as_tibble() %>%
-	ggplot(aes(name, time)) + 
-		geom_boxplot() +
+	ggplot(aes(expr, time)) + 
 		#ggbeeswarm::geom_beeswarm() +
-		ggbeeswarm::geom_quasirandom() +
+		ggbeeswarm::geom_quasirandom(size = 0.2) +
+		geom_boxplot(outlier.shape = NA, fill = NA, color = "red") +
 		scale_y_log10() + 
-		labs(title = "Comparative Runtimes", y = "time /ns", x = "Condition")
+		labs(title = "Comparative Runtimes", y = "time /ns", x = "Condition") + 
+		theme_bw()
 ```
+
+# Growing a data.frame
+
+
+```{r}
+n <- 100
+n_bench <- 50
+df_creation <- microbenchmark::microbenchmark(
+	grow = {
+		df <- data.frame(A = integer())
+		for(i in 1:n) df <- rbind(df, data.frame(A = i))
+	},
+	"pre-allocate" = {
+		df <- data.frame(A = integer(length = n))
+		for(i in 1:n) df[i, 1] <- i
+	},
+	direct = {
+		df <- data.frame(A = 1:n)
+	},
+	times = n_bench
+)
+
+#boxplot(object_creation)
+
+df_creation %>%
+	as_tibble() %>%
+	ggplot(aes(expr, time)) + 
+		#ggbeeswarm::geom_beeswarm() +
+		ggbeeswarm::geom_quasirandom(size = 0.2) +
+		geom_boxplot(outlier.shape = NA, fill = NA, color = "red") +
+		scale_y_log10() + 
+		labs(title = "Comparative Runtimes", y = "time /ns", x = "Condition") + 
+		theme_bw()
+```
+
+```{r}
+lengths <- seq(1, 1000, length.out = 10)
+lst <- vector(mode = "list", length = length(lengths))
+for (i in seq_along(lengths)) {
+	n <- lengths[i]
+	lst[[i]] <- microbenchmark::microbenchmark(
+	grow = {
+		df <- data.frame(A = integer())
+		for(i in 1:n) df <- rbind(df, data.frame(A = i))
+	},
+	"pre-allocate" = {
+		df <- data.frame(A = integer(length = n))
+		for(i in 1:n) df[i, 1] <- i
+	},
+	direct = {
+		df <- data.frame(A = 1:n)
+	},
+	times = n_bench
+	) %>% 
+		tibble::as_tibble() %>%
+		dplyr::mutate(length = n)
+}
+effect_of_vec_len_df <- dplyr::bind_rows(lst)
+
+effect_of_vec_len_df %>%
+	ggplot(., aes(length, time)) +
+	#geom_point(aes(color = expr), size = 0.2) + 
+	scale_y_log10() +
+	#geom_line(aes(color = expr)) + 
+	geom_smooth(
+		aes(color = expr),
+		#method = "lm", formula = "y ~ x"
+		method = "gam", formula = y ~ s(x, bs = "cs")
+	) + 
+	theme_bw() + 
+	labs(
+		title = "Change in runtime with number of iterations",
+		y = "time /ns", color = "Condition",
+		x = "Length of vector"
+	) 
+```
+
+
+```{r}
+dplyr::bind_rows(
+	effect_of_vec_len %>% dplyr::mutate(type = "vector"),
+	effect_of_vec_len_df %>% dplyr::mutate(type = "data.frame")
+) %>%
+	ggplot(., aes(length, time)) +
+	#geom_point(aes(color = expr), size = 0.2) + 
+	scale_y_log10(labels = scales::comma) +
+	#geom_line(aes(color = expr)) + 
+	geom_smooth(
+		aes(color = expr),
+		#method = "lm", formula = "y ~ x"
+		method = "gam", formula = y ~ s(x, bs = "cs")
+	) + 
+	theme_bw() + 
+	labs(
+		#title = "Pre-allocating data.frames is still faster",
+		title = "Vector growth faster now, df pre-allocation still faster",
+		subtitle = "Runtime by length",
+		y = "time /ns", color = "Condition",
+		x = "Length of vector"
+	) +
+	facet_wrap(~type)
+```
+
 
 # Vectorisation
 
 ```{r}
-amat <- matrix(rnorm(10000),nrow = 100)
-
-
-subsetting_vectors <- dplyr::bind_rows(
-	microbenchmark::microbenchmark({
+amat <- matrix(rnorm(10000), nrow = 100)
+subsetting_vectors <- microbenchmark::microbenchmark(
+	"subsetting, loop" = {
 		bmat <- matrix(NA, nrow(amat)/2, ncol(amat))
 		for(i in 1:nrow(bmat)) bmat[i,] <- amat[2*i-1,] * amat[2*i,]
-	}),
-	microbenchmark::microbenchmark({
+	},
+	"subsetting, vectorised" = {
 		bmat2 <- amat[seq(1, nrow(amat), by=2),] *
 		amat[seq(2, nrow(amat), by=2),]
-	})
-) %>%
-	dplyr::mutate(
-		name = dplyr::case_when(
-			grepl("bmat2 ", expr) ~ "subsetting, vectorised",
-			grepl("bmat ", expr) ~ "subsetting, loop"
-		)
-	)
-
+	},
+	times = 50
+) 
 #all.equal(bmat, bmat2)
 
 
 subsetting_vectors %>%
 	as_tibble() %>%
-	ggplot(aes(name, time)) + 
+	ggplot(aes(expr, time)) + 
 		geom_boxplot() +
 		#ggbeeswarm::geom_beeswarm() +
 		ggbeeswarm::geom_quasirandom() +
@@ -129,51 +269,165 @@ myenv$tmp
 
 ```{r}
 set.seed(42)
+#n <- 1e5
+#n <- 1e3
 n <- 1e5
 values <- 1:n
-keys <- purrr::map_chr(1:n, ~paste0(sample(letters,10), collapse = ""))
 
-named_vec <- values
-names(named_vec) <- keys
+keys <- purrr::map_chr(1:n, ~paste0(
+	sample(c(letters, LETTERS, 1:100),sample(10:15,1)),
+	collapse = ""
+))
+# Ensure that all n keys are unique
+keys <- unique(keys)
+length(keys)
+while(length(keys) < n) {
+	nn <- n - length(keys)
+	new_keys <- purrr::map_chr(1:nn, ~paste0(
+		sample(c(letters, LETTERS, 1:100),sample(10:15,1)),
+		collapse = ""
+	))
+	keys <- unique(c(keys, new_keys))
+}
+length(keys)
 
-named_lst <- as.list(named_vec)
 
-my_env <- new.env(hash=TRUE) 
-purrr::walk2(keys, values, ~{my_env[[.x]] <- .y})
 
-example_key <- keys[10]
-
-find_hash <- dplyr::bind_rows(
-	microbenchmark::microbenchmark({
-		named_vec[example_key]
-	}),
-	microbenchmark::microbenchmark({
-		named_lst[example_key]
-	}),
-	microbenchmark::microbenchmark({
-		my_env[[example_key]]
-	}) %>%
-	dplyr::mutate(
-		name = dplyr::case_when(
-			grepl("named_lst", expr) ~ "named list",
-			grepl("named_vec", expr) ~ "named vector",
-			grepl("my_env", expr) ~ "hash"
-		)
-	)
-)
-
-find_hash
-
-find_hash %>%
-	as_tibble() %>%
-	ggplot(aes(expr, time)) + 
-		geom_boxplot(outlier.shape = NA) +
-		#ggbeeswarm::geom_beeswarm() +
-		ggbeeswarm::geom_quasirandom() +
-		scale_y_log10() + 
-		labs(title = "Comparative Runtimes", y = "time /ns", x = "Condition")
+object_construction <- microbenchmark::microbenchmark(
+	"named vector" = {
+		named_vec <- values
+		names(named_vec) <- keys
+	},
+	"named list" = {
+		named_lst <- as.list(named_vec)
+	},
+	"hash" = {
+		my_env <- new.env(hash=TRUE) 
+		purrr::walk2(keys, values, ~{my_env[[.x]] <- .y})
+	},
+	"data.frame" = {
+		df <- data.frame(keys = keys, values = values)
+	},
+	"indexed data.table" = {
+		dt <- data.table(keys = keys, values = values)
+		setkey(dt, keys) 
+	},
+	times = 100
+) %>% 
+	tibble::as_tibble() %>%
+	dplyr::mutate(length = n)
 
 ```
+
+```{r}
+n_bench <- 13
+lengths <- round(seq(1, 1e5, length.out = 20))
+lst <- vector(mode = "list", length = length(lengths))
+lstr <- vector(mode = "list", length = length(lengths))
+for (i in seq_along(lengths)) {
+	n <- lengths[i]
+	values <- 1:n
+	
+	keys <- purrr::map_chr(1:n, ~paste0(
+		sample(c(letters, LETTERS, 1:100),sample(10:15,1)),
+		collapse = ""
+	))
+	# Ensure that all n keys are unique
+	keys <- unique(keys)
+	length(keys)
+	while(length(keys) < n) {
+		nn <- n - length(keys)
+		new_keys <- purrr::map_chr(1:nn, ~paste0(
+			sample(c(letters, LETTERS, 1:100),sample(10:15,1)),
+			collapse = ""
+		))
+		keys <- unique(c(keys, new_keys))
+	}
+	length(keys)
+	
+	named_vec <- values
+	names(named_vec) <- keys
+	
+	lst[[i]] <- microbenchmark::microbenchmark(
+		"named vector" = {
+		named_vec <- values
+		names(named_vec) <- keys
+	},
+	"named list" = {
+		named_lst <- as.list(named_vec)
+	},
+	"hash" = {
+		my_env <- new.env(hash=TRUE) 
+		purrr::walk2(keys, values, ~{my_env[[.x]] <- .y})
+	},
+	"data.frame" = {
+		df <- data.frame(keys = keys, values = values)
+	},
+	"indexed data.table" = {
+		dt <- data.table(keys = keys, values = values)
+		setkey(dt, keys) 
+	},
+	times = n_bench
+	) %>% 
+		tibble::as_tibble() %>%
+		dplyr::mutate(length = n, type = "Construction")
+	
+	example_key <- sample(keys, 1)
+	
+	named_lst <- as.list(named_vec)
+	
+	my_env <- new.env(hash=TRUE) 
+	purrr::walk2(keys, values, ~{my_env[[.x]] <- .y})
+	
+	dt <- data.table(keys = keys, values = values)
+	setkey(dt, keys) 
+	
+	df <- data.frame(keys = keys, values = values)
+	
+	lstr[[i]] <- microbenchmark::microbenchmark(
+		"named vector" = {
+			named_vec[example_key]
+		},
+		"named list" = {
+			named_lst[example_key]
+		},
+		"hash" = {
+			my_env[[example_key]]
+		},
+		"data.frame" = {
+			df[df$keys == example_key,]
+		},
+		"indexed data.table" = {
+			dt[keys == example_key]
+			#dt[keys == example_key][[2]]
+		},
+		times = n_bench
+	) %>% 
+		tibble::as_tibble() %>%
+		dplyr::mutate(length = n, type = "Retreival")
+
+}
+effect_of_vec_len <- dplyr::bind_rows(lst,lstr)
+```
+
+```{r, fig.width=12, fig.height=6.75}
+effect_of_vec_len %>%
+	ggplot(., aes(length, time)) +
+	scale_y_log10() +
+	geom_smooth(
+		aes(color = expr),
+		#method = "lm", formula = "y ~ x"
+		method = "gam", formula = y ~ s(x, bs = "cs")
+	) + 
+	theme_bw() + 
+	labs(
+		title = "Change in runtime with number of elements",
+		y = "time /ns", color = "Condition",
+		x = "Length of vector"
+	) +
+	facet_wrap(~type, ncol = 2)
+```
+
 
 ## non-member
 
@@ -249,3 +503,37 @@ hash_as_index %>%
 		labs(title = "Comparative Runtimes", y = "time /ns", x = "Condition")
 ```
 
+
+# Benchmarking libraries
+
+- microbenchmark https://cran.r-project.org/package=microbenchmark
+- rbenchmark https://cran.r-project.org/package=rbenchmark
+- bench https://github.com/r-lib/bench
+
+
+R trivia R = S-1, as no unaray operator ++
+
+
+# $> EXERCISE
+
+```{r}
+x <- matrix(rnorm(1e5, mean = 1), nrow = 100)
+x[sample(seq_along(x), 1000)] <- NA
+
+tictoc::tic()
+if(all(!is.na(x))) {
+	if(mean(x) > 0) {
+		summary(as.vector(x))
+	}
+}
+tictoc::toc()
+```
+
+```{r}
+# We only calculate the mean if data doesn't contain NAs
+tictoc::tic()
+if(all(!is.na(x)) && mean(x) > 0) {
+	summary(as.vector(x))
+}
+tictoc::toc()
+```

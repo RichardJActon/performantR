@@ -29,10 +29,22 @@ output:
 </style>
 
 ```{r setup, include=FALSE}
+suppressPackageStartupMessages({
+	library(dplyr)
+	library(profvis)
+	library(ggplot2)
+	library(Rcpp)
+	library(targets)
+	library(microbenchmark)
+	library(tictoc)
+	library(future)
+	library(furrr)
+})
+
 knitr::opts_chunk$set(
-  fig.width=9, fig.height=4, fig.retina=2, 
-  out.width="100%",
-  message = FALSE
+	fig.width=9, fig.height=4, fig.retina=2, 
+	out.width="100%",
+	message = FALSE
 )
 
 slug <- paste0(
@@ -40,7 +52,8 @@ slug <- paste0(
 		"AG Schumacher / Bioinf. Core",
 		rmarkdown::metadata$author,
 		rmarkdown::metadata$institute,
-		format.Date(Sys.Date())
+		format.Date(Sys.Date()),
+		paste0("[",emo::ji("envelope"),"racton@uni-koeln.de](mailto:racton@uni-koeln.de)") 
 	),
 	collapse = " | "
 )
@@ -66,92 +79,740 @@ style_duo_accent(colors = palette)
 ```
 
 ```{r xaringanExtra, echo=FALSE}
-xaringanExtra::use_xaringan_extra(c("panelset", "scribble"))
+xaringanExtra::use_xaringan_extra(c("panelset", "scribble", "tile_view", "editable","share_again"))
 ```
 
 # Performant R
 
-- Performance Tips & Tricks
+- Profiling R to find bottlenecks with {[profvis](https://rstudio.github.io/profvis/)}
 	- Beware premature optimisation!
-- Coding efficiently !== Writing efficient code
+
+> "The real problem is that programmers have spent far too much time worrying about efficiency in the wrong places and at the wrong times; __premature optimization is the root of all evil (or at least most of it) in programming.__" - *_Donald Knuth - The Art of Computer Programming_*
+	
+
+- Performance Tips & Tricks
+	- Vectorise all the things
+	- Don't Grow objects
+	- Slighly hacky hash tables
+- Coding efficiently != Writing efficient code
 	- Functional Programming in R
-- Parallel processing with {future}s
+- Parallel processing with {[future](https://cran.r-project.org/web/packages/future/vignettes/future-1-overview.html)}s
 - Caching computationally expensive results
-	- Using pipeline managers {targets}
+	- faster save and load with {[qs](https://github.com/traversc/qs)} & {[fst](https://www.fstpackage.org/)}
+	- Using pipeline managers {[targets](https://books.ropensci.org/targets/)}
+
 
 .slug[`r slug`]
+
+---
+
+# Slides & Code
+
+[]()
+
+```{r, echo=FALSE, fig.width=2, fig.height=2, fig.align='center'}
+plot(qrcode::qr_code("https://richardjacton.github.io/"))
+```
+
+---
+
+# Profiling with {[profvis](https://rstudio.github.io/profvis/)} and RStudio
+
+.panelset[
+.panel[.panel-name[Why Profile your code?]
+
+- Don't waste your time optimizing the wrong thing
+- Know Your bottlenecks!
+	- Don't assume you know what is taking the most time, test it!
+	- See what is taking the most time &/or memory
+	- Prioritise these things to make your code faster
+- How?
+	– Profiling with {[profvis](https://rstudio.github.io/profvis/)}
+	- Other Simple marking tools e.g. {[bench](https://github.com/r-lib/bench)} & {[tictoc](https://collectivemedia.github.io/tictoc/)}
+
+- in RStudio:
+	- __Profile > Profile Selected Line(s)__
+
+]
+
+```{r, profvis, panelset = TRUE}
+profvis::profvis(height = "400px",{
+	n <- 1e6
+	df <- data.frame(
+		group = purrr::map_chr(
+			letters[1:10], ~(paste0(.x, collapse = ""))
+		),
+		value = rnorm(n) #<<
+	)
+	
+	plot <- ggplot(df, aes(value)) + 
+		geom_density() + 
+		facet_wrap(~group)
+})
+```
+
+.panel[.panel-name[video demo]
+
+<center>
+<iframe width="80%" height="400px" src="https://www.youtube-nocookie.com/embed/rmnee9I2dvk" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+</center>
+
+]
+
+]
+
+.slug[`r slug`]
+
+???
+Figure out what the actual bottlenecks are in your code so you know what to prioritise when trying to make things go faster.
+There is no point spending hours making the wrong thing go fast if it is bottlenecked by something else.
+
+In Depth Video on profiling:
+https://www.youtube.com/watch?v=LR8S2lrH_XM
+
+Other resource:
+[R Programming for Data Science - Roger D. Peng Ch 19](https://bookdown.org/rdpeng/rprogdatascience/profiling-r-code.html)
+
+? cover other benmarking tools, microbenchmark, tictoc etc.?
+
+---
+
+# $> EXERCISE - profiling
+
+The following code is for moving square in a simulated game of monopoly 
+
+Profiling the larger codebase for simulating the same revealed that rolling the dice was taking up a lot of the total run time.
+This is an action which happen many times in the execution of the code so optimizing here is high leverage.
+
+Use {[profvis](https://rstudio.github.io/profvis/)} to find the slow parts and try to make it faster
+
+*Note: square 11 is Jail*
+
+This example is lightly adapted from 'Efficient R programming' by Colin Gillespie & Robin Lovelace [^2]
+
+[^2]: https://csgillespie.github.io/efficientR/performance.html#example-optimising-the-move_square-function
+
+---
+
+.panelset[
+
+```{r, slow_monopoly, panelset = TRUE}
+profvis(height = "450px", { initial <- sample(1:40, 1e3, replace = TRUE)
+	new <- integer(length = 1e3)
+	for (i in seq_along(initial)) {
+		current <- initial[i]
+		df <- data.frame(
+			d1 = sample(seq(1, 6), 3, replace = TRUE),
+			d2 = sample(seq(1, 6), 3, replace = TRUE)
+		)
+		df$Total <- apply(df, 1, sum)
+		df$IsDouble <- df$d1 == df$d2
+		if(df$IsDouble[1] & df$IsDouble[2] & df$IsDouble[3]) {
+			current <- 11 
+			current <- current + sum(df$Total[1:3])
+		} else if (df$IsDouble[1]) {
+			current <- current + sum(df$Total[1:2])
+		} else {
+			current <- current + sum(df$Total[1])
+		}
+		if(current %% 40 == 0) {new[i] <- 40} else {new[i] <- current %% 40}
+	}
+})
+```
+
+]
+
+.slug[`r slug`]
+
+???
+
+`move_square` function body, calling in functional form did not give linewise
+results for some reason.
+
+---
+
+.panelset[
+
+```{r, fast_monopoly, panelset = TRUE}
+profvis(height = "400px", {initial <- sample(1:40, 1e3, replace = TRUE)
+	new <- integer(length = 1e3)
+	for (i in seq_along(initial)) {
+		current <- initial[i]
+		rolls <- matrix(sample(seq(1, 6), 6, replace = TRUE), ncol = 2) # data.frame -> matrix #<<
+		Total <- rowSums(rolls) # apply -> rowSums #<< 
+		IsDouble <- rolls[,1] == rolls[,2]
+		if(IsDouble[1] && IsDouble[2] && IsDouble[3]) { # & to && #<< 
+			current <- 11 # Go to Jail!
+		} else if (IsDouble[1] && IsDouble[2]) { #<<
+			current <- current + sum(Total[1:3])
+		} else if (IsDouble[1]) {
+			current <- current + sum(Total[1:2])
+		} else {
+			current <- current + sum(Total[1])
+		}
+		if(current %% 40 == 0) {new[i] <- 40} else {new[i] <- current %% 40}
+	}
+})
+```
+
+.panel[.panel-name[Explanation]
+
+### Example improvements
+
+- `sample` is only run once in this version
+	- Only calling sample once to generate all the rolls has less overhead than making two seperate function calls
+- `matrix` is often faster than `data.frame`
+	- matrices are secretly vectors and dataframes are secretly lists of vectors.
+	Matrices being simpler and less flexible data structures have less overhead than data.frames.
+- Vectorise with `rowSums` instead of `apply`
+	- `rowSums` is an efficient C implementation whereas apply does it's iteration in R which will be slower
+- `&&` is faster than `&` and is valid for single comparisons
+	- `&` & `|` are vectorised, `&&` & `|` only evaluate the first element
+
+- __BONUS__ Double and triple rolls occur relatively rarely, can you get even more performance by only rolling them when needed?
+
+]
+
+]
+
+.slug[`r slug`]
+
+???
+
+> R 3.4 introduced JIT (Just in time compilation), the R interpreter will now by default cache the compiled byte code of certain R code calls making subsequent calls faster.
+
+(I think this may also alter some profvis outputs so that JIT compiled code does not always have granular line by line times? I may be wrong about this but the behaviour does not always match what I'd expect from some examples especially user defined function calls)
+
+```{r}
+df <- data.frame(a = c(1,2,3), b = c("A","B","C")) # mixed types
+df
+as.list(df)
+attributes(df)
+str(df)
+```
+
+```{r}
+mat <- matrix(c(1,2,3,"A","B","C"), byrow = TRUE, nrow = 2)
+mat
+attributes(mat) # all one type
+str(mat)
+```
 
 ---
 
 # Performancs Tips & Tricks
 
 - Vectorise all the things
-- DON’T Grow vectors
+- DON’T Grow vectors (This used to matter a lot more)
 - Slightly Hacky hash tables
 - Give up and Write C++
 
-- Beware Premature of optimisation!
-- Know Your bottlenecks - profiling
+- Misc.
 
 .slug[`r slug`]
 
----
-
-# Profiling with {Profvis} and RStudio
-
-- Beware Premature of optimisation! (“root of all evil - Knuth”)
-	- Know Your bottlenecks – profiling
-	- Profile your code to see what is taking time (&/or memory)
-	{Profvis}
-	- Rstudio: Profile > Profile Selected Line(s)
-	- https://www.youtube.com/watch?v=rmnee9I2dvk
-
-.slug[`r slug`]
+.footnote[
+See also: [The R Inferno](https://www.burns-stat.com/pages/Tutor/R_inferno.pdf)
+]
 
 ---
 
-# Vectorise all the things
+## Vectorise all the things
+
+.pull-left[
 
 - In R (almost) everything is a vector
-	- Rule of Thumb: vector > loop
-	- Applies to matrices/arrays too
+	- Rule of Thumb: vector is faster than loop
+
+```{r, eval=FALSE}
+# Grow
+vec <- numeric(0)
+for(i in 1:n) vec <- c(vec, i)
+
+# pre-allocate
+vec <- numeric(n)
+for(i in 1:n) vec[i] <- i
+
+#direct
+vec <- 1:n
+```
+
+]
+
+.pull-right[
+
+```{r, echo=FALSE}
+tar_read(object_creation_plot)
+```
+
+]
+
 
 .slug[`r slug`]
 
+???
+
+- Applies to matrices/arrays too as these are secretly vectors
+		- Matrix arithmetic/linear algebra is very fast if you can cast your problem in these terms you can get a speedup
+
+
 ---
 
-# DON’T Grow vectors
+## DON’T Grow vectors (?)
+
+> __Before R 3.4, growing a vector in a loop was expensive__ - each time the vector grew by one, R would copy the vector to a new block of memory, with the new item at the end. However, as of R 3.4, R tries to put vectors in a memory location with room to grow, and if there exists only one reference to the vector, it can grow in place, except in the uncommon case where there’s no more room to grow. (If there are two references to the vector, then R must make a copy.) This means that __growing a vector is a fast operation, as long as there’s only one reference to it.__
+
+> Although __growing a vector is now fast, growing a data frame is still an expensive operation__ and results in copying all of the data. [^1]
+
+The old advice now applies mostly just to `data.frame`s
 
 - Append == BAD
-- If you know the length of your output declare the datastructure you are going to put it in in advance
+- If you know the length of your output declare the data structure you are going to put your results in in advance
+	- If you have an upper bound make the larger data structure and shrink it to just the populated values when done.
+
+[^1]: https://rstudio.github.io/profvis/examples.html
 
 .slug[`r slug`]
 
 ---
 
-# Slightly Hacky hash tables
+## Object Growth Benchmarking 
 
-- hashed
+.pull-left[
+- Vector pre-allocation has slight benefits for vectors (length > ~ 165 *for my system) 
+- Relatively small when compared to the impact on `data.frame`s
+
+```{r, eval=FALSE}
+# grow
+df <- data.frame(A = integer())
+for(i in 1:n) df <- rbind(df, data.frame(A = i))
+# pre-allocate
+df <- data.frame(A = integer(length = n))
+for(i in 1:n) df[i, 1] <- i
+# direct
+df <- data.frame(A = 1:n)
+```
+]
+
+.pull-right[
+```{r, echo=FALSE}
+tar_read(effect_length_vec_vs_df_plot) %>% plotly::ggplotly(height = 400)
+```
+]
+
+---
+
+## Slightly Hacky hash tables
+
+- Hash tables let you rapidly find things by name
+- R does not have an 'ordinary' data structure that implements hash tables
+- R `environments` however can be hashed
+
+```{r}
+myenv <- new.env(hash = TRUE) 
+myenv$tmp <- "test"
+myenv$tmp
+```
+
+- `myenv` Can be used much like a named list but cannot be subset by index
+- nor can they be renamed like a list
+
+```{r, error=TRUE}
+myenv[1]; names(myenv)[1] <- "renamed"
+```
 
 .slug[`r slug`]
 
 ---
 
-# Give up and Write C++ - But in R!
+## Constructing hashed environments
 
-- The {Rcpp} library
+- Environments must be constructed by iteration not directly from vectors
+
+```{r}
+keys <- c("A", "B", "C"); values <- 1:3
+purrr::walk2(keys, values, ~{myenv[[.x]] <- .y})
+ls(myenv)
+```
+
+- Constructing hashed environments is slow
+- Retrieving from them is very fast, irrespective of size
+
+.slug[`r slug`]
+
+???
+
+hashtables / hashmaps explanations
+
+https://www.youtube.com/watch?v=KyUTuwz_b7Q
+
+https://www.youtube.com/watch?v=FhNJ6aikTVI
+
+hashtable performance in R
+
+https://www.r-bloggers.com/2015/03/hash-table-performance-in-r-part-i/
+
+https://blog.dominodatalab.com/a-quick-benchmark-of-hashtable-implementations-in-r
+
+---
+
+## Performace Trade-offs in `R` hashtables
+
+- It is very quick to find things in a hashtable but...
+- It takes a long time to construct a hashtable
+
+```{r, echo=FALSE, fig.width=9, fig.height=3.5, fig.retina=3}
+tar_read(effect_of_vec_len_plot) %>% plotly::ggplotly(height = 430)
+```
+
+
+---
+
+## Give up and Write C++ - But in R!
+
+- The {[Rcpp](https://www.rcpp.org/)} library make this easy
+
+```{r}
+cppFunction(
+	"bool isOddCpp(int num = 10) {
+		bool result = (num % 2 == 1);
+		return result;
+	}"
+)
+isOddCpp(42L); isOddCpp(69L)
+```
+
+- The `cppFunction` lets you write simple in-line C++ functions and use them in R
+- This is possible with C, FORTRAN and even Rust `r emo::ji("crab")` but a lot more work
 
 .slug[`r slug`]
 
 ---
 
-# DON	’t do any of the above! - YET
+### {Rcpp} beyond `cppFunction()`
 
-- Don’t prematurely optimise your code until you know what your bottlenecks are or you will waste a lot of time and effort!
+- For longer code use a file with the `.cpp` extension and the `sourceCpp()` function.
+- The header should contain:
 
-- Profiling Your code
-	- Simple run time checks
-	- Rstudio profiling tools
+```{Rcpp, eval=FALSE}
+#include <Rcpp.h>
+using namespace Rcpp;
+```
+
+- Functions to export to `R` should be preceded by: `// [[Rcpp::export]]`. (like `@export` in Roxygen)
+- R code in special comments will run when the file is sourced, this is useful for testing e.g.
+
+```{Rcpp, eval=FALSE}
+/***
+# R Code 
+x <- isOddCpp(3)
+*/
+```
+
+- Example file: [Rcpp_examples.cpp](Rcpp_examples.cpp)
+- In R markdown use the chunk argument: `engine = 'Rcpp'` to write C++ inline
+
+
+---
+
+### monopoly example in {Rcpp}
+
+.panelset[
+.panel[.panel-name[code]
+```{r}
+cppFunction("int move_square(int current) {
+	IntegerVector dice {1,2,3,4,5,6}; IntegerVector rolls = sample(dice, 2, true);
+	bool isDouble = rolls(0) == rolls(1);
+	if(isDouble) {
+		IntegerVector rolls2 = sample(dice, 2, true); // only run 1/6 times
+		bool isDouble2 = rolls2(0) == rolls2(1);
+		if(isDouble2) {
+			IntegerVector rolls3 = sample(dice, 2, true); // only run 1/36 times
+			bool isDouble3 = rolls3(0) == rolls3(1);
+			if(isDouble3) { current = 11; return(current); } // Go to Jail!
+		} else { current += sum(rolls) + sum(rolls2); return(current); }
+	}
+	current += sum(rolls);
+	if(current % 40 == 0) { return current; } else { return current % 40; }
+}")
+```
+
+__Remember C++ has 0 based indexing!__
+
+]
+.panel[.panel-name[Profiling {Rcpp} monopoly]
+The probability of a double is $\frac{1}{6}$ and of a triple $\frac{1}{36}$ so save time by only rolling them when they are needed.
+
+too fast for the profiler to measure well!
+
+```{r, Rcpp_monopoly, error=TRUE}
+profvis(height = "400px", {
+	initial <- sample(1:40, 1e3, replace = TRUE)
+	sapply(initial, move_square)
+})
+```
+]
+.panel[.panel-name[Trying {microbench}]
+
+```{r}
+initial <- sample(1:40, 1e3, replace = TRUE)
+res <- microbenchmark::microbenchmark(Rcpp_monopoly = {
+	sapply(initial, move_square)
+})
+res
+```
+
+~2ms down from ~20ms in improved `R` and from ~240ms un-optimised `R`
+
+]
+]
+
+.slug[`r slug`]
+
+???
+
+Rcpp for everyone https://teuder.github.io/rcpp4everyone_en/
+
+Re-writing R in Cpp:
+
+https://adv-r.hadley.nz/rcpp.html
+
+Nice applied biological example:
+
+https://www.youtube.com/watch?v=spVVjrgHHNU
+
+---
+
+### Take care when choosing the C++ Route `r emo::ji("foot")` `r emo::ji("gun")`
+
+For those of us used the the safety of an interpreted language like `R` C++ can be a bit of a foot-gun if we try and get fancy. All kinds of nightmarish memory bugs lurk in the shadows to acost the unwary traveler in these foreign lands. Only venture here when needs must and preferably accompanied by a seasoned veteran of the `C` languages who can sniff out a dangling pointer from 3 miles hence.
+
+I exaggerate, but if you don't know the language you can spend hours trying to fix something relatively simple when a little clever tweak in R might have got you almost as much performance gain.
+
+Developer time and the ability for future people, (including future you), to maintain your code must be considered as well as compute time.
+
+.slug[`r slug`]
+---
+
+# *More Power! `r emo::ji("high_voltage")`* Need speed? just add threads!
+
+- Parallel processing with Futures
+- How not to use all your RAM
+
+- Futures as an interface to HPC Schedulers with {[future.batchtools](https://future.batchtools.futureverse.org/)}
+- {[bigstatsr](https://privefl.github.io/bigstatsr/)} On disc matrices for massive models etc.
+
+.slug[`r slug`]
+
+---
+
+## Parallelism with Futures
+
+.panelset[
+.panel[.panel-name[parallel processing]
+- There a variety of ways to do parallel and asyncronous processing in R
+- {[future](https://future.futureverse.org/)} provides a nice consistent interface to many of them, it is usually best to use it for this reason.
+	- {[foreach](https://cran.r-project.org/web/packages/foreach/vignettes/foreach.html)} remains popular and has compatability with {future}
+	- Avoid using base {parallel} `mclappy` etc. as these are not cross platform
+
+- With {[future](https://future.futureverse.org/)} the __USER__ defines the parallel runtime / backend
+- With {[progressr](https://progressr.futureverse.org/)} the __USER__ defines how they you like to receive progress updates
+
+- {[clustermq](https://mschubert.github.io/clustermq/)} Has less overhead on HPC clusters than {[future](https://future.futureverse.org/)} but requires support from the cluster.
+
+]
+.panel[.panel-name[{foreach} and why to use the {future} API]
+<center>
+<iframe width="65%" height="375px" src="https://www.youtube-nocookie.com/embed/GC5VXjc52t0" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+</center>
+]
+.panel[.panel-name[{[future](https://future.futureverse.org/)} & {[progressr](https://progressr.futureverse.org/)}]
+<center>
+<iframe width="65%" height="375px" src="https://www.youtube-nocookie.com/embed/FRF0c0Wls3E" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+</center>
+]
+]
+
+
+
+.slug[`r slug`]
+
+???
+
+longer more detailed talk on future
+https://www.youtube.com/watch?v=2ZlpFkFMy7E&t=600s
+
+furrr
+https://www.youtube.com/watch?v=hlx3-iv6HIQ
+
+devtime vs runtime
+https://www.youtube.com/watch?v=ttJCwzfsAc8&list=TLPQMDMwNTIwMjK5d2liOjkIEQ&index=2
+
+advanced asyncronous processing with promises: https://rstudio.github.io/promises/articles/overview.html
+(most useful for Shiny apps)
+
+---
+
+## Parallelism with Futures
+
+.panelset[
+.panel[.panel-name[wait...]
+- Coding for futures
+	- {future.apply} parallel versions of the base `apply` function family
+	- {furrr} parallel versions of the {purrr} map functions
+	- %<-% Future assignment, RHS is evaluated in a subprocess
+
+```{r}
+tic()
+result <- furrr::future_map(letters[1:5], ~Sys.sleep(1))
+toc()
+```
+
+Wait... Why did it take 5 seconds to wait 5 seconds in parallel? shouldn't it only take ~1?
+
+Yes but first we need a `plan()`! the default behaviour of the `future_*` functions is to run sequentially just like their serial counterparts.
+]
+
+.panel[.panel-name[plans]
+
+```{r}
+plan(multisession, workers = 5)
+tic()
+result <- furrr::future_map(letters[1:5], ~Sys.sleep(1))
+toc()
+plan(sequential)
+```
+
+Running `plan(sequential)` at the end resets things to normal and closes remaining child processes.
+
+Note that there is some overhead associated with making child processes it took almost 2 seconds to wait 5 seconds in parallel
+
+]
+]
+.slug[`r slug`]
+
+---
+
+## Evaluation topologies - more complex plans
+
+.pull-left[
+A complex plan:
+
+```{r, eval = FALSE}
+plan(list(
+	tweak(remote, workers = "cheops"),
+	# name of a remote host to ssh into
+	# e.g. cheops1
+	tweak(
+		batchtools_slurm, resources = list(
+		ntasks = 5,
+		mem_per_cpu = 16000L,
+		walltime = "06:00:00" 
+	)),
+	tweak(multisession, workers = 10)
+))
+```
+
+]
+.pull-right[
+The code:
+
+```{r, eval = FALSE}
+chromosomes <- as.roman(1:5);
+samples <- 1:10
+result %<-% # ssh
+	furrr::future_map(chromosomes, ~{ 
+	# Seperate Slurm Jobs
+		chr <- .x
+		furrr::future_map(samples, ~{ 
+		# Individual cores on the compute nodes
+			data <- readr::read_tsv(
+				paste0(chr, "_", .x, ".tsv"))
+			)
+		}
+	})
+```
+]
+
+__I DO NOT recommend doing this over ssh if the connection is lost before the job is finished the results will not be collected!__
+
+.slug[`r slug`]
+
+???
+
+Note that using a remote host requires that you can connect to the host without
+a password prompt. This can be achieved with a password protected ssh key using
+an ssh agent which keeps the key unlocked on your local system for a period of
+time after an initial password prompt. 
+
+Where I placed 'cheops' in the above example you can substitute:
+<username>@remote.host e.g. racton@cheops.rrz.uni-koeln.de
+or define a convenient allias for your `~/.ssh/config` file
+
+```
+Host cheops # set the connection name / alias
+	Hostname cheops.rrz.uni-koeln.de
+	User racton # YOUR USERNAME
+	IdentityFile ~/.ssh/id_rsa # this is the default and can be left out
+	ForwardX11 yes # other optional ssh connection settings
+```
+
+---
+
+### Configuring HPC for {future.batchtools} with Slurm
+
+To begin dispatching jobs from within R scripts you need to configure {future.batchtools}
+
+The `R` module needs to be loaded by default
+
+Batchtools needs two config files:
+
+`~/.batchtools.conf.R` To set your default Job resource requests
+`~/.batchtools.slurm.tmpl` As a Slurm Job template
+
+Templates for these files are [R_on_cheops](./R_on_cheops)
+
+???
+
+If you want to work interactively with the scheduler and use RStudio then I would recommend starting RStudio on a head node or in an interactive job in a terminal multiplexer such as [screen](https://www.putorius.net/linux-screen-command.html) or [tmux](https://www.howtogeek.com/671422/how-to-use-tmux-on-linux-and-why-its-better-than-screen/) then connecting via ssh port forwarding. SSH port forwarding means that the rendering of the UI is done client-side not server-side as with X11 forwarding so the experience of using a GUI is much smoother. The terminal multiplexer will keep the RStudio server job running even if your connection is lost so you can reconnect without losing your session.
+
+see: R_on_cheops/cheops_R_remote.nb.html
+
+---
+
+## How not to use all your RAM
+
+- R likes to copy things into memory, do not pass big objects to subprocesses or you will eat all your RAM!
+- Do not reference large globals from within code that will be execuded in a subprocess.
+- Subset first to be safe
+	- Beware of lazy evaluation!
+		- `r emo::ji("disappointed")` `function(x[i])`
+		- `r emo::ji("smiley")` `y <- x[i]; function(y)`
+	- In the first example the entirety of `x` is passed to the function's environment and the sub-setting happens there.
+- Read from file directly from the sub-process and don't pass an object through the parent environment.
+
+The default upper limit of on object size passed between sessions is ~500Mb though you can adjust this with `options(future.globals.maxSize= Inf)`, or a less than infinite value in bytes if you are doing this though you may want to rethink your approach it this is likely to be inefficient.
+
+.small[_*Tip:*_ if you remove `rm()` a big object from an R session you won't immediately get your memory back. Running the garbage collector manually with `gc()` can speed this up.]
+
+.slug[`r slug`]
+
+---
+
+# Fast serialisation with {[qs](https://github.com/traversc/qs)} & {[fst](https://www.fstpackage.org/)}
+
+- `r emo::ji("rage")` `save(); load()`
+	- unwanted side effects from namespace clashes and unexpected objects
+- `r emo::ji("neutral")` `saveRDS(x); x <- readRDS()`
+	- Saves single object, the name is defined by assignment
+- `r emo::ji("sunglasses")` `qs::qsave(); qs::qread()`
+	- similar to `RDS` functions but used the highly performant `lz4` / `zstd` compression libraries to speed thing up
+	
+- Specifically for `data.frame` like objects `fst::write_fst(), fst::read_fst()`
+	- Uses the same compression libraries as `qs` but only works on tabular data __No List Columns__
+	- However this allows on disk row/column reading `r emo::ji("exploding_head")`
+		- Doing: `fst::read_fst("data.fst", columns = c(1,2), from = 1, to = 50)` only reads columns 1 & 2 and rows 1 to 50 into memory.
+		- With other methods you have to read in everything and drop the things you don't need afterwards.
 
 .slug[`r slug`]
 
@@ -191,54 +852,18 @@ xaringanExtra::use_xaringan_extra(c("panelset", "scribble"))
 
 ---
 
-# More Power! - Need speed just add threads
+# Additional Resources
 
-- Parallel processing with Futures
-- How not to use all your RAM
-- 
-- Futures as an interface to HPC Schedulers with {future.batchtools}
-- ~BIGstatsR – name? On disc matrices for massive models etc.
+- https://www.youtube.com/watch?v=78icyDMZJyQ
 
-.slug[`r slug`]
 
----
+factors
+rle
+return early
+integers
 
-# Parallelism with Futures
 
-- There a variety of ways to do parallel and asyncronous processing in R
-- {future} provides a nice consistent interface to many of them, but may not always be the best choice.
 
-.slug[`r slug`]
 
----
-
-# Parallelism with Futures
-
-- Coding for futures
-	- {future.apply}
-	- {furrr}
-	- %<-%
-
-.slug[`r slug`]
-
----
-
-# Parallelism with Futures
-
-- ‘Future plans’
-	- `plan(list(tweak(),tweak()))`
-
-.slug[`r slug`]
-
----
-
-# How not to use all your RAM
-
-- R likes to copy things into memory, do not pass big objects to subprocesses or you will eat all your RAM
-- Subset first to be safe
-	- Beware of lazy evaluation 
-		- `r emo::ji("smiley")` `function(x[i])`
-		- `r emo::ji("disappointed")` `y <- x[i]; function(y)`
-
-.slug[`r slug`]
-
+https://csgillespie.github.io/efficientR/
+note: `r format(object.size(initial), "Kb")`

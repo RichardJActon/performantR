@@ -1,0 +1,37 @@
+#!/bin/bash
+
+## Default resources can be set in your .batchtools.conf.R by defining the variable
+## 'default.resources' as a named list.
+
+<%
+# relative paths are not handled well by Slurm
+log.file <- fs::path_expand(log.file)
+Rv <- paste0("module load ",resources$Rv,"\n") # default R/3.5.2
+-%>
+
+#SBATCH --job-name=<%= job.name %>
+#SBATCH --output=<%= log.file %>
+#SBATCH --error=<%= log.file %>
+#SBATCH -A !! Your research group !!
+## e.g. #SBATCH -A AG-Dilthey
+#SBATCH --time=<%= resources$walltime  %>
+#SBATCH --ntasks=<%= resources$ntasks %>
+#SBATCH --mem-per-cpu=<%= resources$mem_per_cpu %>
+<%= if (!is.null(resources$partition)) sprintf(paste0("#SBATCH --partition='", resources$partition, "'\n")) %>
+<%= if (array.jobs) sprintf("#SBATCH --array=1-%i", nrow(jobs)) else "" %>
+
+## Initialize work environment like
+## source /etc/profile
+<%= if(!is.null(resources$modules)){cat(paste0(paste0("module load ",resources$modules),collapse="\n"))} %>
+<%= Rv %>
+## Export value of DEBUGME environemnt var to slave
+export DEBUGME=<%= Sys.getenv("DEBUGME") %>
+
+<%= sprintf("export OMP_NUM_THREADS=%i", resources$omp.threads) -%>
+<%= sprintf("export OPENBLAS_NUM_THREADS=%i", resources$blas.threads) -%>
+<%= sprintf("export MKL_NUM_THREADS=%i", resources$blas.threads) -%>
+
+## Run R:
+## we merge R output with stdout from SLURM, which gets then logged via --output option
+Rscript -e 'batchtools::doJobCollection("<%= uri %>")'
+
