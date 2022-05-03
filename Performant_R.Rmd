@@ -201,7 +201,7 @@ Other resource:
 
 The following code is for moving square in a simulated game of monopoly 
 
-Profiling the larger codebase for simulating the same revealed that rolling the dice was taking up a lot of the total run time.
+Profiling the larger codebase for simulating the game revealed that rolling the dice was taking up a lot of the total run time.
 This is an action which happen many times in the execution of the code so optimizing here is high leverage.
 
 Use {[profvis](https://rstudio.github.io/profvis/)} to find the slow parts and try to make it faster
