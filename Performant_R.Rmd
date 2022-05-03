@@ -550,7 +550,7 @@ cppFunction("int move_square(int current) {
 			IntegerVector rolls3 = sample(dice, 2, true); // only run 1/36 times
 			bool isDouble3 = rolls3(0) == rolls3(1);
 			if(isDouble3) { current = 11; return(current); } // Go to Jail!
-		} else { current += sum(rolls) + sum(rolls2); return(current); }
+		} else { current += sum(rolls2); }
 	}
 	current += sum(rolls);
 	if(current % 40 == 0) { return current; } else { return current % 40; }
