@@ -108,11 +108,25 @@ xaringanExtra::use_xaringan_extra(c("panelset", "scribble", "tile_view", "editab
 
 # Slides & Code
 
-[]()
+.right-column[
+### git repo
 
+[github.com/RichardJActon/performantR](https://github.com/RichardJActon/performantR)
+
+`git clone https://github.com/RichardJActon/performantR.git`
+
+### Slides Directly
+
+[richardjacton.github.io/performantR/Performant_R.html](https://richardjacton.github.io/performantR/Performant_R.html)
+
+]
+
+.left-column[
 ```{r, echo=FALSE, fig.width=2, fig.height=2, fig.align='center'}
-plot(qrcode::qr_code("https://richardjacton.github.io/"))
+#fig.width=2, fig.height=2,
+plot(qrcode::qr_code("https://github.com/RichardJActon/performantR"))
 ```
+]
 
 ---
 
