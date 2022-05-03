@@ -39,6 +39,7 @@ suppressPackageStartupMessages({
 	library(tictoc)
 	library(future)
 	library(furrr)
+	library(xaringanthemer)
 })
 
 knitr::opts_chunk$set(
@@ -60,8 +61,6 @@ slug <- paste0(
 ```
 
 ```{r xaringanthemer, echo=FALSE}
-library(xaringanthemer)
-
 palette <- c(
 	background_white = "#FFFFFF",
 	general_text_black = "#000000",
@@ -81,30 +80,6 @@ style_duo_accent(colors = palette)
 ```{r xaringanExtra, echo=FALSE}
 xaringanExtra::use_xaringan_extra(c("panelset", "scribble", "tile_view", "editable","share_again"))
 ```
-
-# Performant R
-
-- Profiling R to find bottlenecks with {[profvis](https://rstudio.github.io/profvis/)}
-	- Beware premature optimisation!
-
-> "The real problem is that programmers have spent far too much time worrying about efficiency in the wrong places and at the wrong times; __premature optimization is the root of all evil (or at least most of it) in programming.__" - *_Donald Knuth - The Art of Computer Programming_*
-	
-
-- Performance Tips & Tricks
-	- Vectorise all the things
-	- Don't Grow objects
-	- Slighly hacky hash tables
-- Coding efficiently != Writing efficient code
-	- Functional Programming in R
-- Parallel processing with {[future](https://cran.r-project.org/web/packages/future/vignettes/future-1-overview.html)}s
-- Caching computationally expensive results
-	- faster save and load with {[qs](https://github.com/traversc/qs)} & {[fst](https://www.fstpackage.org/)}
-	- Using pipeline managers {[targets](https://books.ropensci.org/targets/)}
-
-
-.slug[`r slug`]
-
----
 
 # Slides & Code
 
@@ -126,7 +101,38 @@ xaringanExtra::use_xaringan_extra(c("panelset", "scribble", "tile_view", "editab
 #fig.width=2, fig.height=2,
 plot(qrcode::qr_code("https://github.com/RichardJActon/performantR"))
 ```
+
+- [*p*] presenter view
+- [*o*] overview
+- [*f*] fullscreen
+- [*h*] help/more
+
 ]
+
+.slug[`r slug`]
+
+---
+
+# Performant R
+
+- Profiling R to find bottlenecks with {[profvis](https://rstudio.github.io/profvis/)}
+	- Beware premature optimisation!
+
+> "The real problem is that programmers have spent far too much time worrying about efficiency in the wrong places and at the wrong times; __premature optimization is the root of all evil (or at least most of it) in programming.__" - *_Donald Knuth - The Art of Computer Programming_*
+	
+
+- Performance Tips & Tricks
+	- Vectorise all the things
+	- Don't Grow objects
+	- Slighly hacky hash tables
+- Coding efficiently != Writing efficient code
+	- Functional Programming in R
+- Parallel processing with {[future](https://cran.r-project.org/web/packages/future/vignettes/future-1-overview.html)}s
+- Caching computationally expensive results
+	- faster save and load with {[qs](https://github.com/traversc/qs)} & {[fst](https://www.fstpackage.org/)}
+	- Using pipeline managers {[targets](https://books.ropensci.org/targets/)}
+
+.slug[`r slug`]
 
 ---
 
@@ -606,6 +612,47 @@ I exaggerate, but if you don't know the language you can spend hours trying to f
 Developer time and the ability for future people, (including future you), to maintain your code must be considered as well as compute time.
 
 .slug[`r slug`]
+
+---
+
+## Miscalaneous
+
+
+
+.slug[`r slug`]
+
+---
+
+### Smaller Representations
+
+- `character`s are big they can be made a lot smaller with alternative representations
+
+.panelset[.panel[.panel-name[factors]
+
+- factors are secretly integers, each name is stored only once
+	
+```{r}
+mychar <- rep(purrr::map_chr(1:5, ~paste(sample(letters, 10, replace = TRUE), collapse = "")), 2e4)
+format(object.size(mychar), "Kb")
+myfac <- as.factor(mychar); str(myfac); format(object.size(myfac), "Kb")
+```
+
+]
+.panel[.panel-name[Run Length Encoding `rle`]
+
+- Very effective if order does not matter
+- Also good when data is frequently repetitive
+- Store the names and length of the runs of names thus can usually use a shorter integer vector
+
+```{r}
+mychar_sorted <- sort(mychar); mychar_rle <- rle(mychar_sorted); str(mychar_rle)
+format(object.size(mychar_rle), "Kb")
+```
+
+]]
+
+.slug[`r slug`]
+
 ---
 
 # *More Power! `r emo::ji("high_voltage")`* Need speed? just add threads!
@@ -659,11 +706,11 @@ https://www.youtube.com/watch?v=2ZlpFkFMy7E&t=600s
 furrr
 https://www.youtube.com/watch?v=hlx3-iv6HIQ
 
-devtime vs runtime
-https://www.youtube.com/watch?v=ttJCwzfsAc8&list=TLPQMDMwNTIwMjK5d2liOjkIEQ&index=2
-
 advanced asyncronous processing with promises: https://rstudio.github.io/promises/articles/overview.html
 (most useful for Shiny apps)
+
+Common problems, non-exportable objects
+https://cran.r-project.org/web/packages/future/vignettes/future-4-non-exportable-objects.html
 
 ---
 
@@ -836,33 +883,168 @@ The default upper limit of on object size passed between sessions is ~500Mb thou
 
 - If future you / future maintainers of your code can’t understand your optimised code to fix it when it breaks is it really efficient?
 - Consider development time as well as execution time.
+	- Is it a good use of time to spend 5 hours re-writing a piece of code the you will run 5 times total and takes 5 minutes to in C++ so it runs in 20s?
+- `R` is fast to write, and relatively easy to comprehend but can be slow to run
+
+- optimise for developer and maintainer time when writing your code
+	- Simple and self-contained
+	- __Well Documented__
 
 .slug[`r slug`]
+
+???
+
+devtime vs runtime
+https://www.youtube.com/watch?v=ttJCwzfsAc8
 
 ---
 
 # Functional Programming in R
 
-- Good Functions
-	- Referential Transparency (no globals or side effects just params)
-	- Endomorphism (same form as input and output)
-- Map/Reduce
-	- The {purrr} library
+- R is often written in *imperative* style
+	- Typically involves loops and modifications to global state
+	- Good for many problems but often does not scale well to larger code bases
+		- namespace gets cluttered with many objects
+		- Out of order execution in interactive environments can cause inconsistent state
+
+- S the language from which R evolved began as purely *functional* (loops were added later).
+	- So `R` has a functional heritage but is not optimised for recursion like e.g. `haskell`
+	- makes heavier use of lexical scope thus fewer globals
+	- Make a series of transformations to inputs
+
+- Map/Reduce & The {purrr} library
+	- more consistent API then `apply`
+	- better 'type saftey' (insofar as that is a thing in R)
 
 .slug[`r slug`]
 
 ---
 
-# Functional Programming in R
+## Imperative Vs Functional
 
-- Why Write Functions?
-	- Reusable
-	- Testable
-	- Portable
-	- Self-contained
-		- lexical scoping reduces the complexity of the state of the program which often grows very large in imperative style
+.pull-left[
+Imperative Style
+```{r}
+resulti <- character(length = length(letters))
+names(resulti) <- LETTERS
+for (i in seq_along(letters)) {
+	resulti[i] <- paste0(letters[i], i)
+}
+head(resulti)
+```
+
+3 assignments, 2 subsets, 1 set length, 3 'lines'
+
+]
+
+.pull-right[
+'Functional' Style
+```{r}
+resultf <- letters %>%
+	purrr::set_names(LETTERS) %>%
+	purrr::map2_chr(
+		., seq_along(.),
+		~paste0(.x, .y)
+	)
+head(resultf)
+```
+
+1 assignment, 0 subsets, 0 set length, 1 'line'
+
+]
 
 .slug[`r slug`]
+
+???
+
+---
+
+## Advantages of Functions
+
+### Why Write Functions?
+- Testable
+- Reusable / Portable / Self-contained
+	- lexical scoping reduces the complexity of the state of the program which often grows very large in imperative style
+
+### Good Functions
+- __Referential Transparency__ (no globals or side effects just params)
+- Endomorphism (same form as input and output)
+- Simple / Single Purpose
+
+.slug[`r slug`]
+
+---
+
+## What makes a good function?
+
+.pull-left[
+
+__BAD__ Function `r emo::ji("rage")`
+
+```{r}
+globalx <- 0L; globaly <- 20
+fun1 <- function(x = 1) {
+	while (globalx < globaly) {
+		globalx <<- globalx + x
+	}
+}
+fun1()
+globalx
+```
+
+Not-referentially transparent, has global side-effects
+
+]
+
+.pull-right[
+__GOOD__ Function `r emo::ji("innocent")`
+
+```{r}
+globalx <- 0L; globaly <- 20
+fun2 <- function(
+	init = 0L, increment = 1, maxv = 20
+) {
+	while (init < maxv) {
+		init <- init + increment
+	}
+	init
+}
+globalx <- fun2(globalx, maxv = globaly)
+globalx
+```
+
+Referentially transparent, has No global side-effects
+
+]
+
+Nothing except the parameter values affect the output of the function
+Nothing in the environment is changed by the function, except by its return value
+
+---
+
+## `%>%` ceci n'est pas une pipe {[magrittr](https://magrittr.tidyverse.org/)}
+
+Pipes are a useful tool for taking the output of one function and giving it to another. Let's say we want to do a series of operations on a vector each of which is a function.
+
+```{r}
+x <- rnorm(10)
+sum(sqrt(abs(x)))
+```
+
+We take the absolute value of x with `abs()`, the square root of each with `sqrt()` and then the sum of the square roots with `sum()`. 
+
+In the code the order is reversed from it's order in the verbal description.
+Reading starts from the outside with `sum` but the logical order of the operations starts with x and works outwards.
+
+```{r}
+x %>% abs() %>% sqrt() %>% sum()
+```
+
+Using the pipe `%>%` from the {[magrittr](https://magrittr.tidyverse.org/)} package you can invert this order, and instead write your code in the order that you might describe or __speak__ what you are doing.
+
+???
+
+https://magrittr.tidyverse.org/logo.png
 
 ---
 
@@ -870,9 +1052,6 @@ The default upper limit of on object size passed between sessions is ~500Mb thou
 
 - https://www.youtube.com/watch?v=78icyDMZJyQ
 
-
-factors
-rle
 return early
 integers
 
@@ -880,4 +1059,3 @@ integers
 
 
 https://csgillespie.github.io/efficientR/
-note: `r format(object.size(initial), "Kb")`
