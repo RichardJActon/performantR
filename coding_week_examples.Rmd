@@ -428,6 +428,122 @@ effect_of_vec_len %>%
 	facet_wrap(~type, ncol = 2)
 ```
 
+## paralelle debug
+
+```{r}
+library(data.table)
+n_bench <- 5
+lengths <- round(seq(1, 1e2, length.out = 3))
+lst <- vector(mode = "list", length = length(lengths))
+lstr <- vector(mode = "list", length = length(lengths))
+maxn <- max(lengths)
+values <- 1:maxn
+
+# Key value pairs generated outside the main benchmarking loop 
+# in the max length required adn subset within the loop to 
+# save on the expensive operation of random key generation
+# and uniqueness checking
+keys <- purrr::map_chr(1:maxn, ~paste0(
+	sample(c(letters, LETTERS, 1:100), sample(10:15, 1)),
+	collapse = ""
+))
+# Ensure that all n keys are unique
+keys <- unique(keys)
+#length(keys)
+while(length(keys) < maxn) {
+	nn <- maxn - length(keys)
+	new_keys <- purrr::map_chr(1:nn, ~paste0(
+		sample(c(letters, LETTERS, 1:100),sample(10:15,1)),
+		collapse = ""
+	))
+	keys <- unique(c(keys, new_keys))
+}
+# The {furrr} package parallelises the {purr} map functions using {future}
+#furrr::future_walk(
+furrr::future_map_dfr(
+	.options = furrr_options(
+		seed = 42#, globals = c("lst","lstr", "lengths", "keys", "values")
+	),
+	seq_along(lengths), ~{
+	i <- .x
+	n <- lengths[i]
+	# random subset of key value pairs of the appropriate length
+	values <- sample(values, n) 
+	keys <- keys[values]
+	named_vec <- values
+	names(named_vec) <- keys
+	
+	#lst[[i]] 
+	lst <- microbenchmark::microbenchmark(
+		"named vector" = {
+			named_vec <- values
+			names(named_vec) <- keys
+		},
+		"named list" = {
+			named_lst <- as.list(named_vec)
+		},
+		"hash" = {
+			my_env <- new.env(hash = TRUE) 
+			purrr::walk2(keys, values, ~{my_env[[.x]] <- .y})
+		},
+		"data.frame" = {
+			df <- data.frame(keys = keys, values = values)
+		},
+		"indexed data.table" = {
+			dt <- data.table(keys = keys, values = values)
+			setkey(dt, keys) 
+		},
+		times = n_bench
+	) %>% 
+		tibble::as_tibble() %>%
+		dplyr::mutate(length = n, type = "Construction")
+	
+	example_key <- sample(keys, 1)
+	
+	named_lst <- as.list(named_vec)
+	
+	my_env <- new.env(hash = TRUE) 
+	purrr::walk2(keys, values, ~{my_env[[.x]] <- .y})
+	
+	# doesnot work multisession - maybe multicore? unlikely
+	# see mc_env_assign.R
+	#furrr::future_walk2(keys, values, ~{my_env[[.x]] <- .y})
+	
+	dt <- data.table(keys = keys, values = values)
+	setkey(dt, keys) 
+	
+	df <- data.frame(keys = keys, values = values)
+	
+	#lstr[[i]]
+	lstr <- microbenchmark::microbenchmark(
+		"named vector" = {
+			named_vec[example_key]
+		},
+		"named list" = {
+			named_lst[example_key]
+		},
+		"hash" = {
+			my_env[[example_key]]
+		},
+		"data.frame" = {
+			df[df$keys == example_key,]
+		},
+		"indexed data.table" = {
+			dt[keys == example_key]
+			#dt[keys == example_key][[2]]
+		},
+		times = n_bench
+	) %>% 
+		tibble::as_tibble() %>%
+		dplyr::mutate(length = n, type = "Retreival")
+	
+	dplyr::bind_rows(lst,lstr)
+})
+#effect_of_vec_len <- dplyr::bind_rows(lst,lstr)
+effect_of_vec_len
+```
+
+
 
 ## non-member
 
@@ -537,3 +653,230 @@ if(all(!is.na(x)) && mean(x) > 0) {
 }
 tictoc::toc()
 ```
+
+
+# if else
+
+```{r}
+lengths <- seq(1, 1000, length.out = 50)
+lst <- vector(mode = "list", length = length(lengths))
+marks <- sample(1:100, 1000, replace = TRUE)
+for (i in seq_along(lengths)) {
+	n <- lengths[i]
+	lst[[i]] <- microbenchmark::microbenchmark(
+		"base::ifelse" = {
+			ifelse(marks[1:n] >= 40, "pass", "fail")
+		},
+		"dplyr::if_else" = {
+			dplyr::if_else(marks[1:n] >= 40, "pass", "fail")
+		},
+		"vector" = {
+			results <- rep("fail", length(marks[1:n]))
+			results[marks[1:n] >= 40] <- "pass"
+		},
+		"long_if_else" = {
+			purrr::map_chr(marks[1:n], ~{
+				if(.x >= 40) {
+					"pass"
+				} else {
+					"fail"
+				}
+			})
+		},
+		"long_switch" = {
+			purrr::map_chr(marks[1:n], ~{
+				switch(
+					as.character(.x >= 40), "TRUE" = "pass", "FALSE" = "fail"
+				)
+			})
+		},
+		times = 20
+	) %>% 
+		tibble::as_tibble() %>%
+		dplyr::mutate(length = n)
+}
+if_else_comparisons <- dplyr::bind_rows(lst)
+
+if_else_comparisons %>%
+	ggplot(., aes(length, time)) +
+	#geom_point(aes(color = expr), size = 0.2) + 
+	scale_y_log10() +
+	#geom_line(aes(color = expr)) + 
+	geom_smooth(
+		aes(color = expr),
+		#method = "lm", formula = "y ~ x"
+		method = "gam", formula = y ~ s(x, bs = "cs")
+	) + 
+	theme_bw() + 
+	labs(
+		title = "Comparison of 'ifelse' methods",
+		y = "time /ns", color = "Condition",
+		x = "Length of vector"
+	) 
+
+
+```
+
+
+# sorting
+
+```{r}
+max_len <- 1e3
+n_bench <- 5
+lengths <- round(seq(10, max_len, length.out = 5))
+lst <- vector(mode = "list", length = length(lengths))
+marks <- sample(1:100, max_len, replace = TRUE)
+strings <- purrr::map_chr(1:max_len, ~paste0(
+	sample(c(letters, LETTERS, 1:10),sample(10:15,1)),
+	collapse = ""
+))
+for (i in seq_along(lengths)) {
+	n <- lengths[i]
+	lst[[i]] <- microbenchmark::microbenchmark(
+		"numeric_auto_fwd_complete" = {
+			sort(marks[1:n])
+		},
+		"numeric_auto_decreasing_complete" = {
+			sort(marks[1:n], decreasing = TRUE)
+		},
+		"numeric_auto_rev_complete" = {
+			rev(sort(marks[1:n]))
+		},
+		"numeric_auto_fwd_partial10" = {
+			sort(marks[1:n], partial = 1:10)
+		},
+		
+		"strings_auto_fwd_complete" = {
+			sort(strings[1:n])
+		},
+		"strings_auto_decreasing_complete" = {
+			sort(strings[1:n], decreasing = TRUE)
+		},
+		"strings_auto_rev_complete" = {
+			rev(sort(strings[1:n]))
+		},
+		"strings_auto_fwd_partial10" = {
+			sort(strings[1:n], partial = 1:10)
+		},
+		
+		"numeric_shell_fwd_complete" = {
+			sort(marks[1:n], method = "shell",)
+		},
+		"numeric_quick_fwd_complete" = {
+			sort(marks[1:n], method = "quick")
+		},
+		"numeric_radix_fwd_complete" = {
+			sort(marks[1:n], method = "radix")
+		},
+		
+		"strings_shell_fwd_complete" = {
+			sort(strings[1:n], method = "shell",)
+		},
+		"strings_quick_fwd_complete" = {
+			sort(strings[1:n], method = "quick")
+		},
+		"strings_radix_fwd_complete" = {
+			sort(strings[1:n], method = "radix")
+		},
+		times = n_bench
+	) %>% 
+		tibble::as_tibble() %>%
+		dplyr::mutate(length = n) %>%
+		#tidyr::extract(
+		tidyr::separate(
+			expr, into = c("type", "method", "direction", "complete"), sep = "_",
+			#regex = "(\\w+)_method_(\\w+)_(\\w+)",
+			remove = FALSE
+		)
+}
+sort_comparisons <- dplyr::bind_rows(lst)
+```
+
+
+```{r}
+sort_comparisons %>%
+	dplyr::filter(
+		#direction == "fwd",
+		method == "auto",
+		complete == "complete"
+	) %>%
+	ggplot(., aes(length, time)) +
+	#geom_point(aes(color = expr), size = 0.2) + 
+	scale_y_log10() +
+	#geom_line(aes(color = expr)) + 
+	geom_smooth(
+		aes(color = paste(method, direction)),
+		#method = "lm", formula = "y ~ x"
+		method = "gam", formula = y ~ s(x, bs = "cs")
+	) + 
+	theme_bw() + 
+	facet_grid(~type) +
+	labs(
+		title = "forward, decreasing or reverse?",
+		y = "time /ns", color = "Condition",
+		x = "Length of vector"
+	) 
+```
+
+```{r}
+sort_comparisons %>%
+	dplyr::filter(
+		#direction == "fwd",
+		method != "auto",
+		complete == "complete"
+	) %>%
+	ggplot(., aes(length, time)) +
+	#geom_point(aes(color = expr), size = 0.2) + 
+	scale_y_log10() +
+	#geom_line(aes(color = expr)) + 
+	geom_smooth(
+		aes(color = method),
+		#method = "lm", formula = "y ~ x"
+		method = "gam", formula = y ~ s(x, bs = "cs")
+	) + 
+	theme_bw() + 
+	facet_grid(~type) +
+	labs(
+		title = "Sort algorithms (radix is default)",
+		y = "time /ns", color = "Condition",
+		x = "Length of vector"
+	) 
+```
+
+```{r}
+sort_comparisons %>%
+	dplyr::filter(
+		direction == "fwd",
+		method == "auto"#,
+		#complete != "complete"
+	) %>%
+	ggplot(., aes(length, time)) +
+	#geom_point(aes(color = expr), size = 0.2) + 
+	scale_y_log10() +
+	#geom_line(aes(color = expr)) + 
+	geom_smooth(
+		aes(color = complete),
+		#method = "lm", formula = "y ~ x"
+		method = "gam", formula = y ~ s(x, bs = "cs")
+	) + 
+	theme_bw() + 
+	facet_grid(~type) +
+	labs(
+		title = "Partial sorting (e.g. just top 10)",
+		y = "time /ns", color = "Condition",
+		x = "Length of vector"
+	) 
+```
+
+
+```{r}
+nvec <- sample(1:100, 1e6, replace = TRUE)
+nvec[sample(1:1e6, 5e3)] <- NA_integer_
+tic()
+any(is.na(nvec))
+toc()
+tic()
+anyNA(nvec)
+toc()
+```
+

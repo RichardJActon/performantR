@@ -14,20 +14,23 @@ tar_option_set(packages = c(
 	"data.table",
 	"microbenchmark"
 ))
-plan(list(callr, multisession))
+plan(list(tweak(callr, workers = 1), tweak(multisession, workers = 12)))
 # Parallelism ----
-# involve the pipeline with `tar_make_future(N)``, where N is the number of
+# with`plan(callr)`
+# invoke the pipeline with `tar_make_future(N)`, where N is the number of
 # parallel processes you'd like to use to evaluate the pipeline.
-# Indpendent targets will automatically be computed in parallel and 
+# Independent targets will automatically be computed in parallel and 
 # dependencies will begin evaluation once their parents are done.
+# A custom plan can be specified when you have nested futures within 
+# individual targets
 list(
 	# Hash table lookup performance bechmarks ----
 	tar_target(
 		effect_of_vec_len_parallel, {
-			n_bench <- 13
+			n_bench <- 20
 			lengths <- round(seq(1, 1e6, length.out = 20))
-			lst <- vector(mode = "list", length = length(lengths))
-			lstr <- vector(mode = "list", length = length(lengths))
+			#lst <- vector(mode = "list", length = length(lengths))
+			#lstr <- vector(mode = "list", length = length(lengths))
 			maxn <- max(lengths)
 			values <- 1:maxn
 			
@@ -36,7 +39,7 @@ list(
 			# save on the expensive operation of random key generation
 			# and uniqueness checking
 			keys <- purrr::map_chr(1:maxn, ~paste0(
-				sample(c(letters, LETTERS, 1:100),sample(10:15,1)),
+				sample(c(letters, LETTERS, 1:100), sample(10:15, 1)),
 				collapse = ""
 			))
 			# Ensure that all n keys are unique
@@ -51,7 +54,11 @@ list(
 				keys <- unique(c(keys, new_keys))
 			}
 			# The {furrr} package parallelises the {purr} map functions using {future}
-			furrr::future_walk(seq_along(lengths), ~{
+			# furrr::future_walk(seq_along(lengths), ~{
+			furrr::future_map_dfr(
+					seq_along(lengths),
+					#.options = furrr_options(seed = 42),
+			~{
 				i <- .x
 				n <- lengths[i]
 				# random subset of key value pairs of the appropriate length
@@ -60,7 +67,8 @@ list(
 				named_vec <- values
 				names(named_vec) <- keys
 				
-				lst[[i]] <- microbenchmark::microbenchmark(
+				#lst[[i]]
+				lst <- microbenchmark::microbenchmark(
 					"named vector" = {
 						named_vec <- values
 						names(named_vec) <- keys
@@ -100,7 +108,8 @@ list(
 				
 				df <- data.frame(keys = keys, values = values)
 				
-				lstr[[i]] <- microbenchmark::microbenchmark(
+				#lstr[[i]]
+				lstr <- microbenchmark::microbenchmark(
 					"named vector" = {
 						named_vec[example_key]
 					},
@@ -122,9 +131,11 @@ list(
 					tibble::as_tibble() %>%
 					dplyr::mutate(length = n, type = "Retreival")
 				
+				dplyr::bind_rows(lst,lstr)
+				
 			}, seed = TRUE)
-			effect_of_vec_len <- dplyr::bind_rows(lst,lstr)
-			effect_of_vec_len
+			#effect_of_vec_len <- dplyr::bind_rows(lst,lstr)
+			#effect_of_vec_len
 		},
 		format = "qs"
 	),
@@ -261,5 +272,165 @@ list(
 				x = "Length of vector"
 			) +
 			facet_wrap(~type)
+	),
+	
+	# if else methods comparisons ----
+	
+	tar_target(
+		if_else_comparisons, {
+			lengths <- seq(1, 1000, length.out = 50)
+			lst <- vector(mode = "list", length = length(lengths))
+			marks <- sample(1:100, 1000, replace = TRUE)
+			for (i in seq_along(lengths)) {
+				n <- lengths[i]
+				lst[[i]] <- microbenchmark::microbenchmark(
+					"base::ifelse" = {
+						ifelse(marks[1:n] >= 40, "pass", "fail")
+					},
+					"dplyr::if_else" = {
+						dplyr::if_else(marks[1:n] >= 40, "pass", "fail")
+					},
+					"vector" = {
+						results <- rep("fail", length(marks[1:n]))
+						results[marks[1:n] >= 40] <- "pass"
+					},
+					"long_if_else" = {
+						purrr::map_chr(marks[1:n], ~{
+							if(.x >= 40) {
+								"pass"
+							} else {
+								"fail"
+							}
+						})
+					},
+					"long_switch" = {
+						purrr::map_chr(marks[1:n], ~{
+							switch(
+								as.character(.x >= 40), "TRUE" = "pass", "FALSE" = "fail"
+							)
+						})
+					},
+					times = 20
+				) %>% 
+					tibble::as_tibble() %>%
+					dplyr::mutate(length = n)
+			}
+			if_else_comparisons <- dplyr::bind_rows(lst)
+		}
+	),
+	tar_target(
+		if_else_comparisons_plot,
+		if_else_comparisons %>%
+			ggplot(., aes(length, time)) +
+			scale_y_log10() +
+			geom_smooth(
+				aes(color = expr),
+				method = "gam", formula = y ~ s(x, bs = "cs")
+			) + 
+			theme_bw() + 
+			labs(
+				title = "Comparison of 'ifelse' methods",
+				y = "time /ns", color = "Condition",
+				x = "Length of vector"
+			) 
+	),
+	
+	tar_target(
+		sort_comparisons, {
+			max_len <- 1e5
+			n_bench <- 15
+			lengths <- round(seq(10, max_len, length.out = 12))
+			lst <- vector(mode = "list", length = length(lengths))
+			marks <- sample(1:100, max_len, replace = TRUE)
+			strings <- purrr::map_chr(1:max_len, ~paste0(
+				sample(c(letters, LETTERS, 1:10),sample(10:15,1)),
+				collapse = ""
+			))
+			furrr::future_map_dfr(seq_along(lengths), ~{
+				n <- lengths[.x]
+				microbenchmark::microbenchmark(
+					"numeric_auto_fwd_complete" = {
+						sort(marks[1:n])
+					},
+					"numeric_auto_decreasing_complete" = {
+						sort(marks[1:n], decreasing = TRUE)
+					},
+					"numeric_auto_rev_complete" = {
+						rev(sort(marks[1:n]))
+					},
+					"numeric_auto_fwd_partial10" = {
+						sort(marks[1:n], partial = 1:10)
+					},
+					
+					"strings_auto_fwd_complete" = {
+						sort(strings[1:n])
+					},
+					"strings_auto_decreasing_complete" = {
+						sort(strings[1:n], decreasing = TRUE)
+					},
+					"strings_auto_rev_complete" = {
+						rev(sort(strings[1:n]))
+					},
+					"strings_auto_fwd_partial10" = {
+						sort(strings[1:n], partial = 1:10)
+					},
+					
+					"numeric_shell_fwd_complete" = {
+						sort(marks[1:n], method = "shell",)
+					},
+					"numeric_quick_fwd_complete" = {
+						sort(marks[1:n], method = "quick")
+					},
+					"numeric_radix_fwd_complete" = {
+						sort(marks[1:n], method = "radix")
+					},
+					
+					"strings_shell_fwd_complete" = {
+						sort(strings[1:n], method = "shell",)
+					},
+					"strings_quick_fwd_complete" = {
+						sort(strings[1:n], method = "quick")
+					},
+					"strings_radix_fwd_complete" = {
+						sort(strings[1:n], method = "radix")
+					},
+					times = n_bench
+				) %>% 
+					tibble::as_tibble() %>%
+					dplyr::mutate(length = n) %>%
+					#tidyr::extract(
+					tidyr::separate(
+						expr, sep = "_",
+						into = c("type", "method", "direction", "complete"),
+						#regex = "(\\w+)_method_(\\w+)_(\\w+)",
+						remove = FALSE
+					)
+			})
+		}
+	),
+	tar_target(
+		partial_sort_plot,
+		sort_comparisons %>%
+			dplyr::filter(
+				direction == "fwd",
+				method == "auto"#,
+				#complete != "complete"
+			) %>%
+			ggplot(., aes(length, time)) +
+			#geom_point(aes(color = expr), size = 0.2) + 
+			scale_y_log10() +
+			#geom_line(aes(color = expr)) + 
+			geom_smooth(
+				aes(color = complete),
+				#method = "lm", formula = "y ~ x"
+				method = "gam", formula = y ~ s(x, bs = "cs")
+			) + 
+			theme_bw() + 
+			facet_grid(~type) +
+			labs(
+				title = "Partial sorting (e.g. just top 10)",
+				y = "time /ns", color = "Condition",
+				x = "Length of vector"
+			) 
 	)
 )

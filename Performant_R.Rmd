@@ -40,6 +40,7 @@ suppressPackageStartupMessages({
 	library(future)
 	library(furrr)
 	library(xaringanthemer)
+	library(bigstatsr)
 })
 
 knitr::opts_chunk$set(
@@ -78,13 +79,25 @@ style_duo_accent(colors = palette)
 ```
 
 ```{r xaringanExtra, echo=FALSE}
-xaringanExtra::use_xaringan_extra(c("panelset", "scribble", "tile_view", "editable","share_again"))
+xaringanExtra::use_xaringan_extra(c(
+	"panelset", "scribble", "tile_view", "editable","share_again", "clipboard"
+))
+xaringanExtra::use_progress_bar(color = "#0051BA", location = "bottom")
+xaringanExtra::use_extra_styles(
+	hover_code_line = TRUE, mute_unhighlighted_code = FALSE
+)
+xaringanExtra::use_search(show_icon = TRUE)
+```
+
+```{r JIT, echo=FALSE, include=FALSE}
+old_jit <- compiler::enableJIT(-1)
+compiler::enableJIT(0)
 ```
 
 # Slides & Code
 
 .right-column[
-### git repo
+### `r fontawesome::fa("github")` git repo
 
 [github.com/RichardJActon/performantR](https://github.com/RichardJActon/performantR)
 
@@ -148,7 +161,7 @@ plot(qrcode::qr_code("https://github.com/RichardJActon/performantR"))
 	- Prioritise these things to make your code faster
 - How?
 	– Profiling with {[profvis](https://rstudio.github.io/profvis/)}
-	- Other Simple marking tools e.g. {[bench](https://github.com/r-lib/bench)} & {[tictoc](https://collectivemedia.github.io/tictoc/)}
+	- Other Simple timing/benchmarking tools e.g. {[bench](https://github.com/r-lib/bench)}, {[microbenchmark](https://github.com/joshuaulrich/microbenchmark/)} & {[tictoc](https://collectivemedia.github.io/tictoc/)}
 
 - in RStudio:
 	- __Profile > Profile Selected Line(s)__
@@ -197,126 +210,127 @@ Other resource:
 
 ---
 
-# $> EXERCISE - profiling
+## Benchmarking
 
-The following code is for moving square in a simulated game of monopoly 
+- Profiling may be overkill and you want a quick execution time check. 
+{[tictoc](https://collectivemedia.github.io/tictoc/)} is great for this.
+`tic()` to start timing, `toc()` to stop
+(You can do this with the built-in `Sys.time()` and taking the start/stop diff)
 
-Profiling the larger codebase for simulating the game revealed that rolling the dice was taking up a lot of the total run time.
-This is an action which happen many times in the execution of the code so optimizing here is high leverage.
+- If you need very high temporal precision &/or the ability to repeat benchmark many times {[microbenchmark](https://github.com/joshuaulrich/microbenchmark/)} is your friend
 
-Use {[profvis](https://rstudio.github.io/profvis/)} to find the slow parts and try to make it faster
+- {[bench](https://github.com/r-lib/bench)} provides results in a nice *tidy* format and has built-in visualisations
 
-*Note: square 11 is Jail*
-
-This example is lightly adapted from 'Efficient R programming' by Colin Gillespie & Robin Lovelace [^2]
-
-[^2]: https://csgillespie.github.io/efficientR/performance.html#example-optimising-the-move_square-function
+.slug[`r slug`]
 
 ---
 
-.panelset[
+## $> Exercise: Profiling/Benchmarking
 
-```{r, slow_monopoly, panelset = TRUE}
-profvis(height = "450px", { initial <- sample(1:40, 1e3, replace = TRUE)
-	new <- integer(length = 1e3)
-	for (i in seq_along(initial)) {
-		current <- initial[i]
-		df <- data.frame(
-			d1 = sample(seq(1, 6), 3, replace = TRUE),
-			d2 = sample(seq(1, 6), 3, replace = TRUE)
+Pick a measurement tool {[profvis](https://rstudio.github.io/profvis/)}, {[bench](https://github.com/r-lib/bench)}, {[microbenchmark](https://github.com/joshuaulrich/microbenchmark/)}, {[tictoc](https://collectivemedia.github.io/tictoc/)} or just use `Sys.time()` to determine which of these 2 pieces of code takes longer to run & which part takes longest?
+
+```{r}
+sample_names <- c("WT1","WT2","Mut1","Mut2"); n <- 2e4
+gene_names <- unique(purrr::map_chr(1:n, ~paste0(
+	c(sample(c(letters, LETTERS), sample(3:6, 1)),"-", sample(1:7, 1)), collapse = ""
+))); n <- length(gene_names)
+```
+
+.pull-left[
+```{r, eval=FALSE}
+counts_df <- data.frame(
+	rpois(n, 5), rpois(n, 5),
+	rpois(n, 5), rpois(n, 5),
+	row.names = gene_names
+)
+colnames(counts_df) <- sample_names 
+cond_means_df <- data.frame(
+	WT = rowMeans(counts_df[,1:2]),
+	Mut = rowMeans(counts_df[,3:4])
+)
+```
+]
+
+.pull-right[
+```{r, eval=FALSE}
+counts_m <- matrix(
+	rpois(n*4, 5), dimnames = list(
+		gene_names, sample_names
+	), nrow = n
+)
+cond_means_m <- cbind(
+	rowMeans(counts_m[,1:2]),
+	rowMeans(counts_m[,3:4])
+)
+colnames(cond_means_m) <- c("WT", "Mut")
+```
+]
+
+---
+
+## $> Possible Solution: Profiling/Benchmarking
+
+```{r, echo=FALSE}
+microbenchmark(
+	"df" = {
+		counts_df <- data.frame(
+			rpois(n, 5), rpois(n, 5),
+			rpois(n, 5), rpois(n, 5),
+			row.names = gene_names
 		)
-		df$Total <- apply(df, 1, sum)
-		df$IsDouble <- df$d1 == df$d2
-		if(df$IsDouble[1] & df$IsDouble[2] & df$IsDouble[3]) {
-			current <- 11 
-			current <- current + sum(df$Total[1:3])
-		} else if (df$IsDouble[1]) {
-			current <- current + sum(df$Total[1:2])
-		} else {
-			current <- current + sum(df$Total[1])
-		}
-		if(current %% 40 == 0) {new[i] <- 40} else {new[i] <- current %% 40}
+		colnames(counts_df) <- sample_names
+		# counts_df[1:2,]
+		condition_means_df <- data.frame(
+			WT = rowMeans(counts_df[,1:2]), Mut = rowMeans(counts_df[,3:4])
+		)
+		# head(condition_means_df, 2)
+	},
+	"mat" = {
+		counts_m <- matrix(
+			rpois(n*4, 5), dimnames = list(
+				gene_names, sample_names
+			), nrow = n
+		)
+		# counts_m[1:2,]
+		condition_means_m <- cbind(
+			rowMeans(counts_m[,1:2]), rowMeans(counts_m[,3:4])
+		)
+		colnames(condition_means_m) <- c("WT", "Mut")
+		# head(condition_means_m, 2)
 	}
-})
+)
 ```
 
+.can-edit[
+- Observations?
 ]
 
 .slug[`r slug`]
 
 ???
 
-`move_square` function body, calling in functional form did not give linewise
-results for some reason.
+- calling rpois repeatedly is more expensive than calling it once
+- matrices are 'cheaper' `data.frames`
+- profvis requries a certain minimum
 
 ---
 
-.panelset[
-
-```{r, fast_monopoly, panelset = TRUE}
-profvis(height = "400px", {initial <- sample(1:40, 1e3, replace = TRUE)
-	new <- integer(length = 1e3)
-	for (i in seq_along(initial)) {
-		current <- initial[i]
-		rolls <- matrix(sample(seq(1, 6), 6, replace = TRUE), ncol = 2) # data.frame -> matrix #<<
-		Total <- rowSums(rolls) # apply -> rowSums #<< 
-		IsDouble <- rolls[,1] == rolls[,2]
-		if(IsDouble[1] && IsDouble[2] && IsDouble[3]) { # & to && #<< 
-			current <- 11 # Go to Jail!
-		} else if (IsDouble[1] && IsDouble[2]) { #<<
-			current <- current + sum(Total[1:3])
-		} else if (IsDouble[1]) {
-			current <- current + sum(Total[1:2])
-		} else {
-			current <- current + sum(Total[1])
-		}
-		if(current %% 40 == 0) {new[i] <- 40} else {new[i] <- current %% 40}
-	}
-})
-```
-
-.panel[.panel-name[Explanation]
-
-### Example improvements
-
-- `sample` is only run once in this version
-	- Only calling sample once to generate all the rolls has less overhead than making two seperate function calls
-- `matrix` is often faster than `data.frame`
-	- matrices are secretly vectors and dataframes are secretly lists of vectors.
-	Matrices being simpler and less flexible data structures have less overhead than data.frames.
-- Vectorise with `rowSums` instead of `apply`
-	- `rowSums` is an efficient C implementation whereas apply does it's iteration in R which will be slower
-- `&&` is faster than `&` and is valid for single comparisons
-	- `&` & `|` are vectorised, `&&` & `|` only evaluate the first element
-
-- __BONUS__ Double and triple rolls occur relatively rarely, can you get even more performance by only rolling them when needed?
-
-]
-
-]
-
-.slug[`r slug`]
-
-???
+## Profiling & Benchmarking - a note on JIT
 
 > R 3.4 introduced JIT (Just in time compilation), the R interpreter will now by default cache the compiled byte code of certain R code calls making subsequent calls faster.
 
-(I think this may also alter some profvis outputs so that JIT compiled code does not always have granular line by line times? I may be wrong about this but the behaviour does not always match what I'd expect from some examples especially user defined function calls)
+This means the first time you run something it may run slower than on subsequent runs of the same code, within an R session.
 
-```{r}
-df <- data.frame(a = c(1,2,3), b = c("A","B","C")) # mixed types
-df
-as.list(df)
-attributes(df)
-str(df)
+You can disable JIT compilation if you want to benchmark the un-compiled version of your code e.g. to optimise for speed on first run.
+
+```{r, eval=FALSE}
+old_jit <- compiler::enableJIT(-1) # -ve gets current level
+compiler::enableJIT(0) # 0 is off
+# Code ...
+compiler::enableJIT(old_jit)
 ```
 
-```{r}
-mat <- matrix(c(1,2,3,"A","B","C"), byrow = TRUE, nrow = 2)
-mat
-attributes(mat) # all one type
-str(mat)
-```
+For more on the byte code compiler {[compiler](https://stat.ethz.ch/R-manual/R-devel/library/compiler/html/compile.html)}
 
 ---
 
@@ -327,7 +341,11 @@ str(mat)
 - Slightly Hacky hash tables
 - Give up and Write C++
 
-- Misc.
+- Miscellaneous
+	- efficient representation Lgl, Int, factors, RLE
+	- `ifelse`, `if_else` or `if {} else {}`?
+	- `anyNA()` vs `any(is.na()))`
+	- partial sorting
 
 .slug[`r slug`]
 
@@ -339,10 +357,112 @@ See also: [The R Inferno](https://www.burns-stat.com/pages/Tutor/R_inferno.pdf)
 
 ## Vectorise all the things
 
+- *Rule of Thumb*: __a vector is faster than loop__
+- Applies to matrices/arrays too as these are secretly vectors
+	- Matrix arithmetic/linear algebra is very fast
+	- If you can cast your problem in these terms you can get a speedup
+
+```{r}
+mat <- matrix(1:1e6, nrow = 1000)
+tic()
+x <- integer(length = nrow(mat))
+for (i in 1:nrow(mat)) { x[i] <- sum(mat[i,]) }
+toc()
+tic()
+x <- rowSums(mat)
+toc()
+``` 
+
+
+???
+
+https://r-coder.com/matrix-operations-r/
+
+https://shainarace.github.io/LinearAlgebra/multapp.html
+
+---
+
+### $> Exercise: Vectorise!
+
+.panelset[.panel[.panel-name[Data]
 .pull-left[
 
-- In R (almost) everything is a vector
-	- Rule of Thumb: vector is faster than loop
+```{r}
+prices <- c(
+	"cookies(x12)" = 4,
+	"cakes" = 10, "pies" = 8
+)
+sales <- matrix(
+	c(3,7,2,5,3,5,1,5,4,4,3,2,3,0,4),
+	dimnames = list(
+		c("Mon","Tue","Wed","Thu", "Fri"),
+		names(prices)
+	), nrow = 5
+)
+```
+]
+
+.pull-right[
+
+```{r, echo=FALSE, collapse=TRUE}
+prices; sales
+```
+
+]
+]
+
+.panel[.panel-name[You can do better...]
+
+.pull-left[
+```{r, collapse=TRUE}
+(earnings <- apply(sales, 1, \(x) x * prices))
+(daily_total <- apply(earnings, 2, sum))
+(weekly_total_by_good <- apply(earnings, 1, sum))
+(grand_total <- sum(apply(earnings, 1, sum)))
+```
+]
+
+.pull-right[
+```{r, echo=FALSE}
+#nvbenchres <- 
+bench::mark("not vectorised" = {
+	earnings <- apply(sales, 1, \(x) x * prices)
+	daily_total <- apply(earnings, 2, sum)
+	weekly_total_by_good <- apply(
+		earnings, 1, sum
+	)
+	grand_total <- sum(apply(earnings, 1, sum))
+}) %>% dplyr::select(min,median,total_time)
+```
+]
+]
+]
+
+---
+
+### $> Vectorise! Solution
+
+```{r, collapse=TRUE}
+(earnings <- t(sales) * prices)
+(daily_total <- colSums(earnings))
+(weekly_total_by_good <- rowSums(earnings))
+(grand_total <- sum(earnings))
+```
+
+```{r, echo=FALSE}
+bench::mark("vectorised" = {
+	earnings <- t(sales) * prices
+	daily_total <- colSums(earnings)
+	weekly_total_by_good <- rowSums(earnings)
+	grand_total <- sum(earnings)
+}) %>% dplyr::select(min,median,total_time)
+```
+
+---
+
+## Growing Objects
+
+.pull-left[
 
 ```{r, eval=FALSE}
 # Grow
@@ -372,8 +492,6 @@ tar_read(object_creation_plot)
 
 ???
 
-- Applies to matrices/arrays too as these are secretly vectors
-		- Matrix arithmetic/linear algebra is very fast if you can cast your problem in these terms you can get a speedup
 
 
 ---
@@ -483,6 +601,130 @@ https://blog.dominodatalab.com/a-quick-benchmark-of-hashtable-implementations-in
 
 ```{r, echo=FALSE, fig.width=9, fig.height=3.5, fig.retina=3}
 tar_read(effect_of_vec_len_plot) %>% plotly::ggplotly(height = 430)
+```
+
+
+---
+
+# $> EXERCISE - profiling
+
+The following code is for moving square in a simulated game of monopoly 
+
+Profiling the larger codebase for simulating the game revealed that rolling the dice was taking up a lot of the total run time.
+This is an action which happen many times in the execution of the code so optimizing here is high leverage.
+
+Use {[profvis](https://rstudio.github.io/profvis/)} to find the slow parts and try to make it faster
+
+*Note: square 11 is Jail*
+
+This example is lightly adapted from 'Efficient R programming' by Colin Gillespie & Robin Lovelace [^2]
+
+[^2]: https://csgillespie.github.io/efficientR/performance.html#example-optimising-the-move_square-function
+
+---
+
+.panelset[
+
+```{r, slow_monopoly, panelset = TRUE}
+profvis(height = "450px", { initial <- sample(1:40, 1e3, replace = TRUE)
+	new <- integer(length = 1e3)
+	for (i in seq_along(initial)) {
+		current <- initial[i]
+		df <- data.frame(
+			d1 = sample(seq(1, 6), 3, replace = TRUE),
+			d2 = sample(seq(1, 6), 3, replace = TRUE)
+		)
+		df$Total <- apply(df, 1, sum)
+		df$IsDouble <- df$d1 == df$d2
+		if(df$IsDouble[1] & df$IsDouble[2] & df$IsDouble[3]) {
+			current <- 11 
+			current <- current + sum(df$Total[1:3])
+		} else if (df$IsDouble[1]) {
+			current <- current + sum(df$Total[1:2])
+		} else {
+			current <- current + sum(df$Total[1])
+		}
+		if(current %% 40 == 0) {new[i] <- 40} else {new[i] <- current %% 40}
+	}
+})
+```
+
+]
+
+.slug[`r slug`]
+
+???
+
+`move_square` function body, calling in functional form did not give linewise
+results for some reason.
+
+---
+
+.panelset[
+
+```{r, fast_monopoly, panelset = TRUE}
+profvis(height = "400px", {initial <- sample(1:40, 1e3, replace = TRUE)
+	new <- integer(length = 1e3)
+	for (i in seq_along(initial)) {
+		current <- initial[i]
+		rolls <- matrix(sample(seq(1, 6), 6, replace = TRUE), ncol = 2) # data.frame -> matrix #<<
+		Total <- rowSums(rolls) # apply -> rowSums #<< 
+		IsDouble <- rolls[,1] == rolls[,2]
+		if(IsDouble[1] && IsDouble[2] && IsDouble[3]) { # & to && #<< 
+			current <- 11 # Go to Jail!
+		} else if (IsDouble[1] && IsDouble[2]) { #<<
+			current <- current + sum(Total[1:3])
+		} else if (IsDouble[1]) {
+			current <- current + sum(Total[1:2])
+		} else {
+			current <- current + sum(Total[1])
+		}
+		if(current %% 40 == 0) {new[i] <- 40} else {new[i] <- current %% 40}
+	}
+})
+```
+
+.panel[.panel-name[Explanation]
+
+### Example improvements
+
+- `sample` is only run once in this version
+	- Only calling sample once to generate all the rolls has less overhead than making two seperate function calls
+- `matrix` is often faster than `data.frame`
+	- matrices are secretly vectors and dataframes are secretly lists of vectors.
+	Matrices being simpler and less flexible data structures have less overhead than data.frames.
+- Vectorise with `rowSums` instead of `apply`
+	- `rowSums` is an efficient C implementation whereas apply does it's iteration in R which will be slower
+- `&&` is faster than `&` and is valid for single comparisons
+	- `&` & `|` are vectorised, `&&` & `|` only evaluate the first element
+
+- __BONUS__ Double and triple rolls occur relatively rarely, can you get even more performance by only rolling them when needed?
+
+]
+
+]
+
+.slug[`r slug`]
+
+???
+
+> R 3.4 introduced JIT (Just in time compilation), the R interpreter will now by default cache the compiled byte code of certain R code calls making subsequent calls faster.
+
+(I think this may also alter some profvis outputs so that JIT compiled code does not always have granular line by line times? I may be wrong about this but the behaviour does not always match what I'd expect from some examples especially user defined function calls)
+
+```{r,eval=FALSE}
+df <- data.frame(a = c(1,2,3), b = c("A","B","C")) # mixed types
+df
+as.list(df)
+attributes(df)
+str(df)
+```
+
+```{r, eval=FALSE}
+mat <- matrix(c(1,2,3,"A","B","C"), byrow = TRUE, nrow = 2)
+mat
+attributes(mat) # all one type
+str(mat)
 ```
 
 
@@ -650,6 +892,67 @@ format(object.size(mychar_rle), "Kb")
 ```
 
 ]]
+
+.slug[`r slug`]
+
+---
+
+### Approaches to `if else`
+
+.pull-left[
+
+- `dplyr::if_else()` is faster than `base::ifelse()`
+- Vectorised operations can be faster than either
+- looping over `if(){}else{}` and `switch` is slow
+	- But may have and edge when `length == 1
+
+]
+
+.pull-right[
+```{r, echo=FALSE}
+tar_read(if_else_comparisons_plot) %>% plotly::ggplotly()
+```
+]
+
+.slug[`r slug`]
+
+---
+
+### `anyNA()` is (usually) faster than `any(is.na())`
+
+
+.pull-left[
+
+- Speedup varies with length and sparseness
+
+```{r}
+nvec <- sample(1:100, 1e6, replace = TRUE)
+nvec[sample(1:1e6, 5e3)] <- NA_integer_
+```
+]
+.pull-right[
+```{r}
+tic()
+any(is.na(nvec))
+toc()
+tic()
+anyNA(nvec)
+toc()
+```
+]
+.slug[`r slug`]
+
+---
+
+### Partial Sorts
+
+- The default sorting algorithm 'radix' is fastest of the sort methods
+- `sort(x, decreasing = TRUE)` may be marginally quicker than `rev(sort(x))`, negligible in my testing
+- If you just need part of sort done e.g. the top 10 
+
+```{r, echo=FALSE}
+tar_read(partial_sort_plot) %>% plotly::ggplotly()
+```
 
 .slug[`r slug`]
 
@@ -860,6 +1163,33 @@ The default upper limit of on object size passed between sessions is ~500Mb thou
 
 ---
 
+## Larger than memory matrices with {[bigstatsr](https://privefl.github.io/bigstatsr/)}
+
+There is an upper limit on the max size of a matrix in R.
+A matrix cannot hold more than ~`r format(.Machine$integer.max, big.mark = ",")` elements even if there is enough RAM to do so.
+matrices are just vectors with dimensions and vectors are indexed with an R integer
+Thus the max value of an R integer is the max number of element in an R matrix (sort of).
+
+{[bigstatsr](https://privefl.github.io/bigstatsr/)} makes use of memory mapping to store a file backed matrix on disk in a binary file format that allows 
+
+```{r}
+fbm_demo <- tempfile()
+X <- bigstatsr::FBM(1e5, 1e5, type = "integer", backingfile = fbm_demo)
+X[1:3, 1:5] # Only select manageable subsets
+# X[] - Not a good idea! #<<
+# X[1,] or X[,1] may also not be a good idea depending on the dimensions
+```
+
+## Larger than memory matrices with {[bigstatsr](https://privefl.github.io/bigstatsr/)}
+
+```{r}
+# colSums(X[]) bad idea! # split, apply, combine
+#`bigstatsr::big_apply()`#
+```
+
+
+---
+
 # Fast serialisation with {[qs](https://github.com/traversc/qs)} & {[fst](https://www.fstpackage.org/)}
 
 - `r emo::ji("rage")` `save(); load()`
@@ -1056,6 +1386,21 @@ return early
 integers
 
 
-
-
 https://csgillespie.github.io/efficientR/
+
+.slug[`r slug`]
+
+---
+
+# Feedback, Questions & Extra material
+
+- `r fontawesome::fa("github")` github discussion section
+
+https://github.com/RichardJActon/performantR/discussions
+
+.slug[`r slug`]
+
+```{r, JITend, echo=FALSE}
+compiler::enableJIT(old_jit)
+```
+
