@@ -65,6 +65,13 @@
       "Repository": "RSPM",
       "Hash": "45f0398006e83a5b10b72a90663d8d8c"
     },
+    "RSpectra": {
+      "Package": "RSpectra",
+      "Version": "0.16-1",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "6b5ab997fd5ff6d46a5f1d9f8b76961c"
+    },
     "Rcpp": {
       "Package": "Rcpp",
       "Version": "1.0.8.3",
@@ -72,12 +79,33 @@
       "Repository": "RSPM",
       "Hash": "32e79b908fda56ee57fe518a8d37b864"
     },
+    "RcppArmadillo": {
+      "Package": "RcppArmadillo",
+      "Version": "0.11.0.0.0",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "704ac7bb6a49df5a9a2b014793fcc6cb"
+    },
+    "RcppEigen": {
+      "Package": "RcppEigen",
+      "Version": "0.3.3.9.2",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "4c86baed78388ceb06f88e3e9a1d87f5"
+    },
     "RcppParallel": {
       "Package": "RcppParallel",
       "Version": "5.1.5",
       "Source": "Repository",
       "Repository": "RSPM",
       "Hash": "f3e94e34ff656a7c8336ce01207bc2b8"
+    },
+    "RhpcBLASctl": {
+      "Package": "RhpcBLASctl",
+      "Version": "0.21-247.1",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "e0d1744b1339290bce02b1699230b8b5"
     },
     "askpass": {
       "Package": "askpass",
@@ -120,6 +148,34 @@
       "Source": "Repository",
       "Repository": "RSPM",
       "Hash": "0f4e9d8caa6feaa7e409ae6c30f2ca66"
+    },
+    "bench": {
+      "Package": "bench",
+      "Version": "1.1.2",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "96fdc9419a103087fd765e896299e67f"
+    },
+    "bigassertr": {
+      "Package": "bigassertr",
+      "Version": "0.1.5",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "70195f16d6de60e75b4261980f0e8c25"
+    },
+    "bigparallelr": {
+      "Package": "bigparallelr",
+      "Version": "0.3.2",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "7af49af3962a2b00ab54219d1d321119"
+    },
+    "bigstatsr": {
+      "Package": "bigstatsr",
+      "Version": "1.5.6",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "62daa2298ed48a42b60c2864bfa79773"
     },
     "bit": {
       "Package": "bit",
@@ -177,6 +233,13 @@
       "Repository": "RSPM",
       "Hash": "bb4341986bc8b914f0f0acf2e4a3f2f7"
     },
+    "cowplot": {
+      "Package": "cowplot",
+      "Version": "1.1.1",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "b418e8423699d11c7f2087c2bfd07da2"
+    },
     "cpp11": {
       "Package": "cpp11",
       "Version": "0.4.2",
@@ -218,6 +281,13 @@
       "Source": "Repository",
       "Repository": "RSPM",
       "Hash": "cf6b206a045a684728c3267ef7596190"
+    },
+    "doParallel": {
+      "Package": "doParallel",
+      "Version": "1.0.17",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "451e5edf411987991ab6a5410c45011f"
     },
     "dplyr": {
       "Package": "dplyr",
@@ -272,6 +342,34 @@
       "Source": "Repository",
       "Repository": "RSPM",
       "Hash": "77bd60a6157420d4ffa93b27cf6a58b8"
+    },
+    "ff": {
+      "Package": "ff",
+      "Version": "4.0.5",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "98770e80ceccf7de4f179a252bbfb9ab"
+    },
+    "flock": {
+      "Package": "flock",
+      "Version": "0.7",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "40dfee1c8bd0072c3ead4c50176ca589"
+    },
+    "fontawesome": {
+      "Package": "fontawesome",
+      "Version": "0.2.2",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "55624ed409e46c5f358b2c060be87f67"
+    },
+    "foreach": {
+      "Package": "foreach",
+      "Version": "1.5.2",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "618609b42c9406731ead03adf5379850"
     },
     "fs": {
       "Package": "fs",
@@ -398,6 +496,13 @@
       "Source": "Repository",
       "Repository": "RSPM",
       "Hash": "7ab57a6de7f48a8dc84910d1eca42883"
+    },
+    "iterators": {
+      "Package": "iterators",
+      "Version": "1.0.14",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "8954069286b4b2b0d023d1b288dce978"
     },
     "jquerylib": {
       "Package": "jquerylib",
@@ -560,6 +665,13 @@
       "Repository": "RSPM",
       "Hash": "8bbae1a548d0d3fdf6647bdd9d35bf6d"
     },
+    "profmem": {
+      "Package": "profmem",
+      "Version": "0.6.0",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "4974ce1d5ab22f266af90826f295f6c7"
+    },
     "profvis": {
       "Package": "profvis",
       "Version": "0.3.7",
@@ -643,6 +755,13 @@
       "Source": "Repository",
       "Repository": "RSPM",
       "Hash": "ac78f4d2e0289d4cba73b88af567b8b1"
+    },
+    "rmio": {
+      "Package": "rmio",
+      "Version": "0.4.0",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "59acc756baa1546c24070a98f4eb5b21"
     },
     "sass": {
       "Package": "sass",

@@ -266,12 +266,20 @@ colnames(cond_means_m) <- c("WT", "Mut")
 ```
 ]
 
+.slug[`r slug`]
+
+???
+
+https://www.youtube.com/watch?v=fRv3-LnEUjg
+
 ---
 
 ## $> Possible Solution: Profiling/Benchmarking
 
-```{r, echo=FALSE}
-microbenchmark(
+.pull-left[
+
+```{r}
+mbres <- microbenchmark(
 	"df" = {
 		counts_df <- data.frame(
 			rpois(n, 5), rpois(n, 5),
@@ -300,7 +308,13 @@ microbenchmark(
 	}
 )
 ```
+]
 
+.pull-right[
+```{r, echo=FALSE}
+mbres
+```
+]
 .can-edit[
 - Observations?
 ]
@@ -859,7 +873,7 @@ Developer time and the ability for future people, (including future you), to mai
 
 ## Miscalaneous
 
-
+A grab bag of tidbits
 
 .slug[`r slug`]
 
@@ -867,10 +881,23 @@ Developer time and the ability for future people, (including future you), to mai
 
 ### Smaller Representations
 
+.panelset[
+.panel[.panel-name[integers]
+
+If you can user integers do, they are smaller then doubles, but logicals don't gain you anything over integers.
+
+```{r, collapse=TRUE}
+d <- double(length = 1e6); format(object.size(d), "Kb")
+i <- integer(length = 1e6); format(object.size(i), "Kb")
+ir <- sample(1:1e6, 1e6); format(object.size(ir), "Kb")
+l <- logical(length = 1e6); format(object.size(l), "Kb")
+```
+
+]
+
+.panel[.panel-name[factors]
+
 - `character`s are big they can be made a lot smaller with alternative representations
-
-.panelset[.panel[.panel-name[factors]
-
 - factors are secretly integers, each name is stored only once
 	
 ```{r}
@@ -886,12 +913,32 @@ myfac <- as.factor(mychar); str(myfac); format(object.size(myfac), "Kb")
 - Also good when data is frequently repetitive
 - Store the names and length of the runs of names thus can usually use a shorter integer vector
 
-```{r}
+```{r, collapse=TRUE}
 mychar_sorted <- sort(mychar); mychar_rle <- rle(mychar_sorted); str(mychar_rle)
-format(object.size(mychar_rle), "Kb")
+format(object.size(mychar_sorted), "Kb"); format(object.size(mychar_rle), "Kb")
 ```
 
-]]
+]
+.panel[.panel-name[Sparse matrices]
+
+If your data has many 0 values a sparse matrix from the {[Matrix](https://cran.r-project.org/web/packages/Matrix/index.html)} can reduce it's size. If it's *very* big a file back sparse matrix from {[bigsparser](https://github.com/privefl/bigsparser)} may also be a solution.
+.pull-left[
+
+```{r}
+n <- 1e3; i <- sample(1:n,70); j <- sample(1:n,70); x <- rpois(70,2)
+MS <- Matrix::sparseMatrix(i,j,x=x,dims = c(n,n)); MS[1:2,1:10]
+format(object.size(MS), "Kb")
+```
+]
+.pull-right[
+```{r}
+M <- matrix(nrow = n, ncol = n)
+for (q in seq_along(x)) { M[i[q], j[q]] <- x[q] }
+format(object.size(M), "Kb")
+```
+]
+]
+]
 
 .slug[`r slug`]
 
@@ -997,8 +1044,6 @@ tar_read(partial_sort_plot) %>% plotly::ggplotly()
 ]
 ]
 
-
-
 .slug[`r slug`]
 
 ???
@@ -1014,6 +1059,9 @@ advanced asyncronous processing with promises: https://rstudio.github.io/promise
 
 Common problems, non-exportable objects
 https://cran.r-project.org/web/packages/future/vignettes/future-4-non-exportable-objects.html
+
+foreach with a future backend
+https://cran.r-project.org/web/packages/doFuture/vignettes/doFuture.html
 
 ---
 
@@ -1053,6 +1101,65 @@ Note that there is some overhead associated with making child processes it took 
 
 ]
 ]
+.slug[`r slug`]
+
+---
+
+## $> Exercise: parallelise
+
+.panelset[
+.panel[.panel-name[Exercise]
+
+parallelise the the optimised R implementation of the monopoly `move_square` function and determine approximately at how many simulated moves is it worth the overhead of parallelisation?
+
+]
+
+.panel[.panel-name[Integers]
+
+```{r}
+move_square <- function(current){
+	rolls <- matrix(sample(seq(1, 6), 6, replace = TRUE), ncol = 2)
+	Total <- rowSums(rolls)
+	IsDouble <- rolls[,1] == rolls[,2]
+	if(IsDouble[1] && IsDouble[2] && IsDouble[3]) {
+		current <- 11L # integer! #<<
+	} else if (IsDouble[1] && IsDouble[2]) {
+		current <- current + sum(Total[1:3])
+	} else if (IsDouble[1]) {
+		current <- current + sum(Total[1:2])
+	} else {
+		current <- current + sum(Total[1])
+	}
+	if(current %% 40L == 0L) {current <- 40L} else {current <- current %% 40L} #<<
+	as.integer(current) # ensure the result is in integer form #<<
+}
+```
+]
+
+.panel[.panel-name[solution]
+.pull-left[
+Note the parallel processes can cause problems for random number generation so if you task uses random number generation it should make use of parallel safe RNG.
+
+```{r, eval=FALSE}
+initial <- sample(1:40, 1e5, replace = TRUE)
+move <- purrr::map_int(initial, move_square)
+
+plan(multisession)
+move <- furrr::future_map_int(
+	initial, move_square, .options = furrr_options(seed = TRUE)
+)
+plan(sequential)
+```
+]
+.pull-right[
+
+```{r}
+tar_read(parallel_overhead_plot) %>% plotly::ggplotly()
+```
+]
+]
+]
+
 .slug[`r slug`]
 
 ---
@@ -1163,7 +1270,7 @@ The default upper limit of on object size passed between sessions is ~500Mb thou
 
 ---
 
-## Larger than memory matrices with {[bigstatsr](https://privefl.github.io/bigstatsr/)}
+# Larger than memory matrices with {[bigstatsr](https://privefl.github.io/bigstatsr/)}
 
 There is an upper limit on the max size of a matrix in R.
 A matrix cannot hold more than ~`r format(.Machine$integer.max, big.mark = ",")` elements even if there is enough RAM to do so.
@@ -1174,19 +1281,42 @@ Thus the max value of an R integer is the max number of element in an R matrix (
 
 ```{r}
 fbm_demo <- tempfile()
-X <- bigstatsr::FBM(1e5, 1e5, type = "integer", backingfile = fbm_demo)
+X <- bigstatsr::FBM(1e3, 1e3, type = "integer", backingfile = fbm_demo)
 X[1:3, 1:5] # Only select manageable subsets
 # X[] - Not a good idea! #<<
 # X[1,] or X[,1] may also not be a good idea depending on the dimensions
 ```
 
-## Larger than memory matrices with {[bigstatsr](https://privefl.github.io/bigstatsr/)}
+.slug[`r slug`]
 
-```{r}
-# colSums(X[]) bad idea! # split, apply, combine
-#`bigstatsr::big_apply()`#
-```
+---
 
+## Penalised regression on larger than memory matrices with {[bigstatsr](https://privefl.github.io/bigstatsr/)}
+
+.panelset[
+.panel[.panel-name[Regression]
+
+The `bigstatsr::big_spLogReg()` & `bigstatsr::big_spLinReg()` functions allow the fitting of lasso/elastic net/ridge penalised regression models on these large matrices.
+
+Reading reading a matrix into base R loads all the data into memory by default so you need to construct big matrices by streaming the contents of the file through R into a FBM using approaches describes in the vignette [reading files to a FBM](https://privefl.github.io/bigstatsr/articles/read-FBM-from-file.html).
+]
+.panel[.panel-name[Video]
+
+<center>
+<iframe width="80%" height="400px" src="https://www.youtube-nocookie.com/embed/UXKYqpAo6cs" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+</center>
+
+]
+]
+
+.slug[`r slug`]
+
+???
+
+In depth video from the packge author: https://www.youtube.com/watch?v=UXKYqpAo6cs
+
+bigstatsr parallelism
+https://privefl.github.io/blog/a-guide-to-parallelism-in-r/
 
 ---
 
@@ -1206,6 +1336,10 @@ X[1:3, 1:5] # Only select manageable subsets
 		- With other methods you have to read in everything and drop the things you don't need afterwards.
 
 .slug[`r slug`]
+
+???
+
+with fst you can do things somewhat similarly to a bigmatrix only reading the rows/columns of data that you need in to the process and parallelising over chunks of your data just passing the workers the coords from which to load the data from file not the data itself.
 
 ---
 
@@ -1247,6 +1381,14 @@ https://www.youtube.com/watch?v=ttJCwzfsAc8
 	- better 'type saftey' (insofar as that is a thing in R)
 
 .slug[`r slug`]
+
+???
+
+"The Joy of Functional Programming (for Data Science)" with Hadley Wickham
+https://www.youtube.com/watch?v=bzUmK0Y07ck
+
+[DSC 4.0] What Makes a Good Function - Hadley Wickham keynote
+https://www.youtube.com/watch?v=Qne86lxjgtg
 
 ---
 
@@ -1350,6 +1492,8 @@ Referentially transparent, has No global side-effects
 Nothing except the parameter values affect the output of the function
 Nothing in the environment is changed by the function, except by its return value
 
+.slug[`r slug`]
+
 ---
 
 ## `%>%` ceci n'est pas une pipe {[magrittr](https://magrittr.tidyverse.org/)}
@@ -1372,31 +1516,116 @@ x %>% abs() %>% sqrt() %>% sum()
 
 Using the pipe `%>%` from the {[magrittr](https://magrittr.tidyverse.org/)} package you can invert this order, and instead write your code in the order that you might describe or __speak__ what you are doing.
 
+.slug[`r slug`]
+
 ???
 
 https://magrittr.tidyverse.org/logo.png
 
 ---
 
-# Additional Resources
+# The {[targets](https://docs.ropensci.org/targets/)} pipeline manager
 
-- https://www.youtube.com/watch?v=78icyDMZJyQ
+.panelset[
+.panel[.panel-name[targets]
 
-return early
-integers
+- Many large analyses have slow computationally expensive steps
+- Many outputs e.g. graphics require tweaking but not re-running the whole pipeline
+- figuring out what to rerun, when, and if you've already done it or not becomes complex to keep track of
+- reproducible analysis that you don't have to re-run from scratch to guarantee works
+- Easy to run any independent processes in parallel
+
+To perform some of the benchmarks I presented here I used [_targets.R](./_targets.R) because some of the benchmarks take a very long time to run and I wanted to cache the results. You can see this targets pipeline in the [_targets.R](./_targets.R) file in this presentation's git repo.
 
 
-https://csgillespie.github.io/efficientR/
+]
+
+.panel[.panel-name[targets]
+```{r, eval=FALSE}
+library(targets)
+tar_script({
+	list( # A targets pipeline consists of a list of 'targets'  #<<
+		tar_target(data, read_tsv("data.csv"), format = "file"),
+		tar_target(params, c(0.01,0.1,1)),
+		tar_target(model, fit_model(data, params), pattern = map(params)),
+		tar_target(plot, plot_results(model), pattern = map(params))
+	)
+})
+tar_make() # Only runs 'out of date' targets and their dependencies #<<
+```
+]
+
+.panel[.panel-name[interactive use]
+
+Many of the graphs in this presentation are targets loaded into the R session that builds this presentation
+
+```{r, eval=FALSE}
+x <- tar_read(target)
+tar_load(target2); target
+```
+
+]
+.panel[.panel-name[graph]
+
+```{r}
+targets::tar_visnetwork()
+```
+
+]
+
+.panel[.panel-name[Video]
+
+<center>
+<iframe width="80%" height="400px" src="https://www.youtube-nocookie.com/embed/FODSavXGjYg" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+</center>
+
+]
+
+]
 
 .slug[`r slug`]
+
+???
+
+The targets book
+https://books.ropensci.org/targets/
+
+---
+
+# Additional Resources
+
+There are references and additional resources in the presenters notes throughout this presentation as wells as some extra stuff in the github repo.
+
+In depth walk through example of optimising `R` code for a network analysis
+
+<center>
+<iframe width="80%" height="400px" src="https://www.youtube-nocookie.com/embed/78icyDMZJyQ" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+</center>
+
+.slug[`r slug`]
+
+???
+
+return early
 
 ---
 
 # Feedback, Questions & Extra material
 
-- `r fontawesome::fa("github")` github discussion section
+- Leave comments, questions & Constructive criticism at the [`r fontawesome::fa("github")` github discussion section](https://github.com/RichardJActon/performantR/discussions) for this presentation's repo.
 
 https://github.com/RichardJActon/performantR/discussions
+
+### Like my slides?
+
+Made with:
+
+- {[rmarkdown](https://rmarkdown.rstudio.com/)}
+- {[xaringan](https://github.com/yihui/xaringan/)}
+- {[xaringanExtra](https://github.com/gadenbuie/xaringanExtra)}
+- Icons & emoji from {[fontawesome](https://rstudio.github.io/fontawesome/)} & {[emo](https://github.com/hadley/emo)}
+
+[Tutorial from user2021](https://presentable-user2021.netlify.app/)
 
 .slug[`r slug`]
 
