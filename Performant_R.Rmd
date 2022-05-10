@@ -314,9 +314,9 @@ mbres <- microbenchmark(
 ```{r, echo=FALSE}
 mbres
 ```
-]
 .can-edit[
 - Observations?
+]
 ]
 
 .slug[`r slug`]
