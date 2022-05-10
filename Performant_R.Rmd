@@ -1153,7 +1153,7 @@ plan(sequential)
 ]
 .pull-right[
 
-```{r}
+```{r, echo=FALSE}
 tar_read(parallel_overhead_plot) %>% plotly::ggplotly()
 ```
 ]
