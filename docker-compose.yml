@@ -1,0 +1,33 @@
+version: '3.4'
+
+services:
+  rstudioserver:
+    build:
+      # The directory in which to find the Docker file 
+      # and environment information to build the container
+      context: ./.rstudio_docker
+    container_name: rstudioserver
+    volumes:
+      # mount the current directory to the project directory
+      #  in the container. This is the default working directory
+      #  for rstudio within the container 
+      #  see .rstudio_confir_dir/rstudio-prefs.json
+      - ./:${HOME}/project
+      # mount the .ssh directory from the host home directory to
+      # the home directory in the container so that things like
+      # using git remotes can be authenticated with ssh
+      - ${HOME}/.ssh:${HOME}/.ssh
+      # Mount the Renv cache location on your host system to 
+      # the default Renv cache location in the container
+      - /opt/local/renv/cache:/renv/cache
+      # mount the RStudio configuration from the project
+      # to the default RStudio preferences in the container
+      - ./.rstudio_config_dir:${HOME}/.config/rstudio
+    restart:
+      unless-stopped
+    ports:
+      # host:container
+      - 8686:8787
+    # File in which to specify environment variables for
+    # the container
+    env_file: ./.rstudio_docker/rstudio.env
