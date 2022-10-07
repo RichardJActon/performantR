@@ -2,7 +2,7 @@
 title: "Performant R"
 subtitle: "Doing things faster with R"
 author: "Dr. Richard J. Acton"
-institute: "CECAD"
+institute: "HDBI"
 date: "`r Sys.Date()`"
 output:
   xaringan::moon_reader:
@@ -55,7 +55,7 @@ slug <- paste0(
 		rmarkdown::metadata$author,
 		rmarkdown::metadata$institute,
 		format.Date(Sys.Date()),
-		paste0("[",emo::ji("envelope"),"racton@uni-koeln.de](mailto:racton@uni-koeln.de)") 
+		paste0("[",emo::ji("envelope"),"Richard.Acton@babraham.ac.uk](mailto:Richard.Acton@babraham.ac.uk)") 
 	),
 	collapse = " | "
 )
@@ -80,7 +80,12 @@ style_duo_accent(colors = palette)
 
 ```{r xaringanExtra, echo=FALSE}
 xaringanExtra::use_xaringan_extra(c(
-	"panelset", "scribble", "tile_view", "editable","share_again", "clipboard"
+	"panelset",
+	"clipboard",
+	"tile_view",
+	"editable",
+	"scribble",
+	"share_again"
 ))
 xaringanExtra::use_progress_bar(color = "#0051BA", location = "bottom")
 xaringanExtra::use_extra_styles(
@@ -183,6 +188,18 @@ profvis::profvis(height = "400px",{
 		facet_wrap(~group)
 })
 ```
+
+.panel[.panel-name[Tips]
+
+- The `interval` argument to `profvis` can be set to profile something is too fast for the default `0.01`s
+	- At < `0.005` (5 ms) timing accuracy becomes unreliable
+	
+- Profiling and it's visualisation can be separated
+	- E.g. profiling a script on a headless server
+	- `utils::Rprof` performs the profiling
+		- Output can be saved to file and viewed with `profvis` using the `prof_input` argument
+
+]
 
 .panel[.panel-name[video demo]
 
@@ -519,8 +536,8 @@ tar_read(object_creation_plot)
 The old advice now applies mostly just to `data.frame`s
 
 - Append == BAD
-- If you know the length of your output declare the data structure you are going to put your results in in advance
-	- If you have an upper bound make the larger data structure and shrink it to just the populated values when done.
+- If your __output__ is __of known length declare__ the __data structure__ to house your results __first__
+	- If you have an __upper bound__ make the __larger__ data structure and __shrink__ it to just the populated values when done
 
 [^1]: https://rstudio.github.io/profvis/examples.html
 
@@ -595,6 +612,8 @@ ls(myenv)
 ???
 
 hashtables / hashmaps explanations
+
+Maybe show one of these in the longer workshop session, probably not a compsci audiance so might be valuable for understanding
 
 https://www.youtube.com/watch?v=KyUTuwz_b7Q
 
@@ -710,7 +729,7 @@ profvis(height = "400px", {initial <- sample(1:40, 1e3, replace = TRUE)
 - Vectorise with `rowSums` instead of `apply`
 	- `rowSums` is an efficient C implementation whereas apply does it's iteration in R which will be slower
 - `&&` is faster than `&` and is valid for single comparisons
-	- `&` & `|` are vectorised, `&&` & `|` only evaluate the first element
+	- `&` & `|` are vectorised, `&&` & `||` only evaluate the first element
 
 - __BONUS__ Double and triple rolls occur relatively rarely, can you get even more performance by only rolling them when needed?
 
@@ -746,7 +765,7 @@ str(mat)
 
 ## Give up and Write C++ - But in R!
 
-- The {[Rcpp](https://www.rcpp.org/)} library make this easy
+- The {[Rcpp](https://www.rcpp.org/)} library make this easy *(The R integration not the C++)*
 
 ```{r}
 cppFunction(
@@ -813,7 +832,7 @@ cppFunction("int move_square(int current) {
 }")
 ```
 
-__Remember C++ has 0 based indexing!__
+__Remember C++ has 0 based indexing! (unlike R)__
 
 ]
 .panel[.panel-name[Profiling {Rcpp} monopoly]
