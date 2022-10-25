@@ -2,7 +2,7 @@
 title: "Performant R"
 subtitle: "Doing things faster with R"
 author: "Dr. Richard J. Acton"
-institute: "HDBI"
+institute: "Babraham Institute"
 date: "`r Sys.Date()`"
 output:
   xaringan::moon_reader:
@@ -51,7 +51,7 @@ knitr::opts_chunk$set(
 
 slug <- paste0(
 	c(
-		"AG Schumacher / Bioinf. Core",
+		"HDBI",
 		rmarkdown::metadata$author,
 		rmarkdown::metadata$institute,
 		format.Date(Sys.Date()),
