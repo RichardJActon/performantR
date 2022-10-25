@@ -2,6 +2,7 @@
 library(targets)
 library(future)
 library(future.callr)
+library(furrr)
 options(tidyverse.quiet = TRUE)
 tar_option_set(packages = c(
 	"dplyr",
@@ -12,6 +13,7 @@ tar_option_set(packages = c(
 	"qs",
 	"ggplot2",
 	"data.table",
+	"furrr",
 	"microbenchmark"
 ))
 plan(list(tweak(callr, workers = 1), tweak(multisession, workers = 12)))
@@ -35,7 +37,7 @@ list(
 			values <- 1:maxn
 			
 			# Key value pairs generated outside the main benchmarking loop 
-			# in the max length required adn subset within the loop to 
+			# in the max length required and subset within the loop to 
 			# save on the expensive operation of random key generation
 			# and uniqueness checking
 			keys <- purrr::map_chr(1:maxn, ~paste0(
@@ -432,5 +434,101 @@ list(
 				y = "time /ns", color = "Condition",
 				x = "Length of vector"
 			) 
+	),
+	tar_target(parallel_overhead, {
+		move_square <- function(current){
+			rolls <- matrix(sample(seq(1, 6), 6, replace = TRUE), ncol = 2)
+			Total <- rowSums(rolls)
+			IsDouble <- rolls[,1] == rolls[,2]
+			if(IsDouble[1] && IsDouble[2] && IsDouble[3]) {
+				current <- 11L # integer! #<<
+			} else if (IsDouble[1] && IsDouble[2]) {
+				current <- current + sum(Total[1:3])
+			} else if (IsDouble[1]) {
+				current <- current + sum(Total[1:2])
+			} else {
+				current <- current + sum(Total[1])
+			}
+			if(current %% 40L == 0L) {
+				current <- 40L
+			} else {
+				current <- current %% 40L
+			}
+			as.integer(current)
+		}
+		initial <- sample(1:40, 1e5, replace = TRUE)
+		lengths <- c(1, 1e2, 1e3, 1e4, 5e4, 1e5)
+		#furrr::future_map_dfr(seq_along(lengths), ~{
+		sessions <- c(2,4,6,8,12)
+		prll <- vector(mode = "list", length = length(sessions))
+		for (i in seq_along(sessions)) {
+			plan(multisession, workers = sessions[i])
+			prll[[i]] <- purrr::map_dfr(seq_along(lengths), ~{
+				n <- lengths[.x]
+				microbenchmark::microbenchmark(
+					"Parallel" = {
+						move <- furrr::future_map_int(
+							initial[1:n], move_square,
+							.options = furrr_options(seed = TRUE)
+						)
+					},
+					times = 5
+				) %>% 
+					tibble::as_tibble() %>%
+					dplyr::mutate(length = n, sessions = sessions[i])
+			}#, .options = furrr_options(seed = TRUE)
+			)
+		}
+		# plan(multisession, workers = 4)
+		# prl <- purrr::map_dfr(seq_along(lengths), ~{
+		# 	n <- lengths[.x]
+		# 	microbenchmark::microbenchmark(
+		# 		"Parallel" = {
+		# 			move <- furrr::future_map_int(
+		# 				initial[1:n], move_square,
+		# 				.options = furrr_options(seed = TRUE)
+		# 			)
+		# 		},
+		# 		times = 5
+		# 	) %>% 
+		# 		tibble::as_tibble() %>%
+		# 		dplyr::mutate(length = n, sessions = 1)
+		# }#, .options = furrr_options(seed = TRUE)
+		# )
+		
+		plan(sequential)
+		sql <- purrr::map_dfr(seq_along(lengths), ~{
+			n <- lengths[.x]
+			microbenchmark::microbenchmark(
+				"Sequential" = {
+					move <- purrr::map_int(initial[1:n], move_square)
+				},
+				times = 5
+			) %>% 
+				tibble::as_tibble() %>%
+				dplyr::mutate(length = n, sessions = 1)
+		}#, .options = furrr_options(seed = TRUE)
+		)
+		
+		dplyr::bind_rows(prll,sql)
+	}),
+	tar_target(parallel_overhead_plot,
+		parallel_overhead %>% 
+			dplyr::mutate(time = time / 1e6) %>%
+			ggplot(aes(length, time)) + 
+			geom_smooth(
+				aes(color = expr, linetype = as.factor(sessions)),
+				method = "lm", formula = 'y~x'
+			) +
+			scale_y_log10(labels = scales::comma) +
+			scale_x_continuous(labels = scales::comma) +
+			theme_bw() +
+			labs(
+				title = "Parallel Overhead",
+				y = "time /ns", color = "Evaluation",
+				linetype = "cores",
+				x = "Length of vector"
+			)
 	)
 )
+
