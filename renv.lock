@@ -896,6 +896,13 @@
       "Repository": "RSPM",
       "Hash": "55e157e2aa88161bdb0754218470d204"
     },
+    "visNetwork": {
+      "Package": "visNetwork",
+      "Version": "2.1.2",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "3e48b097e8d9a91ecced2ed4817a678d"
+    },
     "vroom": {
       "Package": "vroom",
       "Version": "1.5.7",
