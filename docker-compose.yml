@@ -1,9 +1,17 @@
 version: '3.4'
-
+  # Start with: `docker compose up -d`
+  # `-d` is for detached, it will run in the background
+  # and also 'survive' a reboot of your system.
+  # On the first time running or to manually rebuild after a 
+  # change to .rstudio_docker/Dockerfile use:
+  # `docker-compose up -d --build`
+  # To stop the container use:
+  # `docker-compose down`
+  # Check it's status with `docker ps`
 services:
   rstudioserver:
     build:
-      # The directory in which to find the Docker file 
+      # The directory in which to find the Dockerfile 
       # and environment information to build the container
       context: ./.rstudio_docker
     container_name: rstudioserver
@@ -21,13 +29,20 @@ services:
       # the default Renv cache location in the container
       - /opt/local/renv/cache:/renv/cache
       # mount the RStudio configuration from the project
-      # to the default RStudio preferences in the container
+      # to the default RStudio preferences location in the container
+      # See the rstudio-prefs.json file for the config details
       - ./.rstudio_config_dir:${HOME}/.config/rstudio
     restart:
       unless-stopped
+      # Automatically restarts the container if it crashes
+      # unless is is manually stopped with e.g.:
+      # `docker stop <container name>`
     ports:
-      # host:container
+      # localhost:container 
       - 8686:8787
+      # 8787 is RStudio Server's default port
+      # It is exposed by the container to the docker network
+      # but can be mapped to an alternative port on the localhost
     # File in which to specify environment variables for
     # the container
     env_file: ./.rstudio_docker/rstudio.env
