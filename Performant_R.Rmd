@@ -1443,7 +1443,7 @@ https://privefl.github.io/blog/a-guide-to-parallelism-in-r/
 
 ???
 
-with fst you can do things somewhat similarly to a bigmatrix only reading the rows/columns of data that you need in to the process and parallelising over chunks of your data just passing the workers the coords from which to load the data from file not the data itself.
+with fst you can do things somewhat similarly to a bigmatrix only reading the rows/columns of data that you need into the process and parallelising over chunks of your data just passing the workers the coords from which to load the data from file not the data itself.
 
 ---
 
@@ -1451,12 +1451,13 @@ with fst you can do things somewhat similarly to a bigmatrix only reading the ro
 
 - If future you / future maintainers of your code can’t understand your optimised code to fix it when it breaks is it really efficient?
 - Consider development time as well as execution time.
-	- Is it a good use of time to spend 5 hours re-writing a piece of code the you will run 5 times total and takes 5 minutes to in C++ so it runs in 20s?
+	- Is it a good use of time to spend 5 hours re-writing a piece of code that you will run 5 times total and takes 5 minutes to run in R in C++ so it runs in 20s?
 - `R` is fast to write, and relatively easy to comprehend but can be slow to run
 
 - optimise for developer and maintainer time when writing your code
 	- Simple and self-contained
 	- __Well Documented__
+	- Unit tests
 
 .slug[`r slug`]
 
@@ -1477,8 +1478,10 @@ https://www.youtube.com/watch?v=ttJCwzfsAc8
 
 - S the language from which R evolved began as purely *functional* (loops were added later).
 	- So `R` has a functional heritage but is not optimised for recursion like e.g. `haskell`
-	- makes heavier use of lexical scope thus fewer globals
-	- Make a series of transformations to inputs
+
+- Functional Style
+	- Makes heavier use of lexical scope, thus fewer globals
+	- Makes a series of transformations to inputs 'pipeline-able'
 
 - Map/Reduce & The {purrr} library
 	- more consistent API then `apply`
