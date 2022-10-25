@@ -1305,6 +1305,8 @@ Host cheops # set the connection name / alias
 	ForwardX11 yes # other optional ssh connection settings
 ```
 
+Add your ssh key to the agent in a terminal session: e.g. `ssh-add ~/.ssh/id_rsa`
+
 ---
 
 # Async, Blocking & Promises
