@@ -1024,11 +1024,66 @@ tar_read(partial_sort_plot) %>% plotly::ggplotly()
 
 ---
 
+# Parallelism, Asynchrony, & Concurrency
+
+Nomenclature and mental models `r emo::ji('brain')`
+
+- **Parallelism**
+	- *Solution*, Making things faster by doing parts of them at the same time
+	- You choose it `r emo::ji("person_facepalming")`
+	- Correctness is the same output as sequential
+- **Concurrency**
+	- *Problem*, multiple possible things happening, potentially, all at once.
+	- It chooses you `r emo::ji("point_right");emo::ji("open_mouth")` (e.g. Shiny)
+	- Correctness is context dependent
+
+
+- **Asynchrony** (related to 'event driven' / 'reactive' programming)
+	- Generally A consequence of parallelism/concurrency
+	- Non-blocking (let's you do other things while you wait)
+	- Handling 
+		- Waiting for the things you need to move on to the next step
+		- Dealing with things that may show up in an unexpected order
+
+.slug[`r slug`]
+
+???
+
+Source for how to think about Parallelism, Asynchrony, & Concurrency
+Jonathan Worthington. Keynote: Perl 6 Concurrency
+https://www.youtube.com/watch?v=hGyzsviI48M
+Slides:
+https://jnthn.net/papers/2019-perlcon-concurrency.pdf
+Tip: The Raku/perl6 community is a great one to follow to learn cool programming things as it's full of massive language design nerds
+
+Async Programming in R
+https://www.youtube.com/watch?v=Vt6f3qMehXI
+
+---
+
+# Task Parallelism Vs Data Parallelism
+
+- **Task parallel**
+	- Do different things which don't have a path dependency at the same time
+
+
+
+- **Data parallel**
+	- Do the same thing to a lot of chunks of data
+	- Operation must be independent of the results on other chunks of the data
+
+.slug[`r slug`]
+
+???
+
+`map` is trivially parallelisable, `reduce` is not
+
+---
+
 # *More Power! `r emo::ji("high_voltage")`* Need speed? just add threads!
 
 - Parallel processing with Futures
-- How not to use all your RAM
-
+	- How not to use all your RAM
 - Futures as an interface to HPC Schedulers with {[future.batchtools](https://future.batchtools.futureverse.org/)}
 - {[bigstatsr](https://privefl.github.io/bigstatsr/)} On disc matrices for massive models etc.
 
@@ -1040,9 +1095,9 @@ tar_read(partial_sort_plot) %>% plotly::ggplotly()
 
 .panelset[
 .panel[.panel-name[parallel processing]
-- There a variety of ways to do parallel and asyncronous processing in R
+- There a variety of ways to do parallel and asynchronous processing in R
 - {[future](https://future.futureverse.org/)} provides a nice consistent interface to many of them, it is usually best to use it for this reason.
-	- {[foreach](https://cran.r-project.org/web/packages/foreach/vignettes/foreach.html)} remains popular and has compatability with {future}
+	- {[foreach](https://cran.r-project.org/web/packages/foreach/vignettes/foreach.html)} remains popular and has compatability with {[future](https://future.futureverse.org/)}
 	- Avoid using base {parallel} `mclappy` etc. as these are not cross platform
 
 - With {[future](https://future.futureverse.org/)} the __USER__ defines the parallel runtime / backend
@@ -1073,7 +1128,7 @@ https://www.youtube.com/watch?v=2ZlpFkFMy7E&t=600s
 furrr
 https://www.youtube.com/watch?v=hlx3-iv6HIQ
 
-advanced asyncronous processing with promises: https://rstudio.github.io/promises/articles/overview.html
+advanced asynchronous processing with promises: https://rstudio.github.io/promises/articles/overview.html
 (most useful for Shiny apps)
 
 Common problems, non-exportable objects
@@ -1087,10 +1142,10 @@ https://cran.r-project.org/web/packages/doFuture/vignettes/doFuture.html
 ## Parallelism with Futures
 
 .panelset[
-.panel[.panel-name[wait...]
+.panel[.panel-name[Wait... What?]
 - Coding for futures
-	- {future.apply} parallel versions of the base `apply` function family
-	- {furrr} parallel versions of the {purrr} map functions
+	- {[future.apply](https://future.apply.futureverse.org/)} parallel versions of the base `apply` function family
+	- {[furrr](https://furrr.futureverse.org/)} parallel versions of the {[purrr](https://purrr.tidyverse.org/)} map functions
 	- %<-% Future assignment, RHS is evaluated in a subprocess
 
 ```{r}
@@ -1101,10 +1156,12 @@ toc()
 
 Wait... Why did it take 5 seconds to wait 5 seconds in parallel? shouldn't it only take ~1?
 
-Yes but first we need a `plan()`! the default behaviour of the `future_*` functions is to run sequentially just like their serial counterparts.
+Yes but first we need a `plan()`! the default behavior of the `future_*` functions is to run sequentially just like their serial counterparts.
 ]
 
-.panel[.panel-name[plans]
+.panel[.panel-name[We need a plan!]
+
+Plans
 
 ```{r}
 plan(multisession, workers = 5)
@@ -1129,7 +1186,7 @@ Note that there is some overhead associated with making child processes it took 
 .panelset[
 .panel[.panel-name[Exercise]
 
-parallelise the the optimised R implementation of the monopoly `move_square` function and determine approximately at how many simulated moves is it worth the overhead of parallelisation?
+Parallelise the the optimized R implementation of the monopoly `move_square` function and determine approximately at how many simulated moves is worth the overhead of parallelisation?
 
 ]
 
@@ -1157,7 +1214,7 @@ move_square <- function(current){
 
 .panel[.panel-name[solution]
 .pull-left[
-Note the parallel processes can cause problems for random number generation so if you task uses random number generation it should make use of parallel safe RNG.
+Note the parallel processes can cause problems for random number generation so make use of parallel safe RNG
 
 ```{r, eval=FALSE}
 initial <- sample(1:40, 1e5, replace = TRUE)
@@ -1165,7 +1222,8 @@ move <- purrr::map_int(initial, move_square)
 
 plan(multisession)
 move <- furrr::future_map_int(
-	initial, move_square, .options = furrr_options(seed = TRUE)
+	initial, move_square,
+	.options = furrr_options(seed = TRUE) #<<
 )
 plan(sequential)
 ```
@@ -1246,6 +1304,31 @@ Host cheops # set the connection name / alias
 	IdentityFile ~/.ssh/id_rsa # this is the default and can be left out
 	ForwardX11 yes # other optional ssh connection settings
 ```
+
+---
+
+# Async, Blocking & Promises
+
+- A simple `future` assignment is blocking
+	- The main R process is tied up waiting for the future to finish and return a result
+- How do we get our main R process back to do other things while we wait?
+
+{Promises}
+
+```{r}
+res <- NULL
+prms <- promises::future_promise({Sys.sleep(1); "Woke Up!"})
+then(prms, function(value) {res <<- value})
+prms # Not done yet
+res # Still NULL
+2+2 # Free to do other things
+Sys.sleep(3)
+prms # All Done!
+res # Now has the promised value
+```
+
+
+.slug[`r slug`]
 
 ---
 
@@ -1648,7 +1731,7 @@ Made with:
 
 .slug[`r slug`]
 
-```{r, JITend, echo=FALSE}
+```{r, JITend, echo=FALSE, include=FALSE}
 compiler::enableJIT(old_jit)
 ```
 
