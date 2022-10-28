@@ -3,6 +3,7 @@ library(targets)
 library(future)
 library(future.callr)
 library(furrr)
+library(Rcpp)
 options(tidyverse.quiet = TRUE)
 tar_option_set(packages = c(
 	"dplyr",
@@ -25,8 +26,83 @@ plan(list(tweak(callr, workers = 1), tweak(multisession, workers = 12)))
 # dependencies will begin evaluation once their parents are done.
 # A custom plan can be specified when you have nested futures within 
 # individual targets
+
+# Functions ----
+
+move_square_bad <- function(current) {
+	df <- data.frame(
+		d1 = sample(seq(1, 6), 3, replace = TRUE),
+		d2 = sample(seq(1, 6), 3, replace = TRUE)
+	)
+	df$Total <- apply(df, 1, sum)
+	df$IsDouble <- df$d1 == df$d2
+	if(df$IsDouble[1] & df$IsDouble[2] & df$IsDouble[3]) {
+		current <- 11L
+		current <- current + sum(df$Total[1:3])
+	} else if (df$IsDouble[1]) {
+		current <- current + sum(df$Total[1:2])
+	} else {
+		current <- current + sum(df$Total[1])
+	}
+	if(current %% 40L == 0L) {current <- 40L} else {current <- current %% 40L}
+	return(current)
+}
+
+move_square_better <- function(current) {
+	rolls <- matrix(sample(seq(1, 6), 6, replace = TRUE), ncol = 2) # data.frame -> matrix #<<
+	Total <- as.integer(rowSums(rolls)) # apply -> rowSums #<< 
+	IsDouble <- rolls[,1] == rolls[,2]
+	if(IsDouble[1] && IsDouble[2] && IsDouble[3]) { # & to && #<< 
+		current <- 11L # Go to Jail!
+	} else if (IsDouble[1] && IsDouble[2]) { #<<
+		current <- current + sum(Total[1:3])
+	} else if (IsDouble[1]) {
+		current <- current + sum(Total[1:2])
+	} else {
+		current <- current + sum(Total[1])
+	}
+	if(current %% 40L == 0L) {current <- 40L} else {current <- current %% 40L}
+	return(current)
+}
+
+move_square_prob <- function(current) {
+	dice <- 1L:6L; rolls <- sample(dice, 2L, replace = TRUE)
+	isDouble <- rolls[1] == rolls[2]
+	if (isDouble) {
+		rolls2 <- sample(dice, 2L, replace = TRUE)
+		isDouble2 <- rolls2[1] == rolls2[2]
+		if (isDouble2) {
+			rolls3 <- sample(dice, 2L, replace = TRUE)
+			isDouble3 <- rolls3[1] == rolls3[2]
+			if(isDouble3) { current <- 11L; return(current) }
+		} else { current <- current + sum(rolls2) }
+	}
+	current <- current + sum(rolls)
+	if(current %% 40L == 0L) { return(current) } else { return(current %% 40L) }
+	return(current)
+}
+
+Rcpp_monopoly_fun_str <- "int move_square_Rcpp(int current) {
+	IntegerVector dice {1,2,3,4,5,6}; IntegerVector rolls = sample(dice, 2, true);
+	bool isDouble = rolls(0) == rolls(1);
+	if(isDouble) {
+		IntegerVector rolls2 = sample(dice, 2, true); // only run 1/6 times
+		bool isDouble2 = rolls2(0) == rolls2(1);
+		if(isDouble2) {
+			IntegerVector rolls3 = sample(dice, 2, true); // only run 1/36 times
+			bool isDouble3 = rolls3(0) == rolls3(1);
+			if(isDouble3) { current = 11; return(current); } // Go to Jail!
+		} else { current += sum(rolls2); }
+	}
+	current += sum(rolls);
+	if(current % 40 == 0) { return current; } else { return current % 40; }
+}"
+cppFunction(Rcpp_monopoly_fun_str)
+
+# Pipeline ----
+
 list(
-	# Hash table lookup performance bechmarks ----
+	## Hash table lookup performance bechmarks ----
 	tar_target(
 		effect_of_vec_len_parallel, {
 			n_bench <- 20
@@ -161,7 +237,7 @@ list(
 			facet_wrap(~type, ncol = 2)
 	),
 	
-	# Simple vector creation ----
+	## Simple vector creation ----
 	tar_target(
 		object_creation, {
 			n <- 100
@@ -194,7 +270,7 @@ list(
 			theme_bw()
 	),
 	
-	# vector growth benchmark ----
+	## vector growth benchmark ----
 	tar_target(
 		effect_of_vec_len_vec, {
 			n_bench <- 50
@@ -224,7 +300,7 @@ list(
 		
 	),
 	
-	# data frame growth benchmark ----
+	## data frame growth benchmark ----
 	tar_target(
 		effect_of_vec_len_df, {
 			n_bench <- 50
@@ -253,7 +329,7 @@ list(
 		}
 	),
 	
-	# Combined plot of vector and data frame growth benchmarks ----
+	## Combined plot of vector and data frame growth benchmarks ----
 	tar_target(
 		effect_length_vec_vs_df_plot,
 		dplyr::bind_rows(
@@ -276,7 +352,7 @@ list(
 			facet_wrap(~type)
 	),
 	
-	# if else methods comparisons ----
+	## if else methods comparisons ----
 	
 	tar_target(
 		if_else_comparisons, {
@@ -336,7 +412,7 @@ list(
 				x = "Length of vector"
 			) 
 	),
-	
+	## Sorting ----
 	tar_target(
 		sort_comparisons, {
 			max_len <- 1e5
@@ -435,27 +511,8 @@ list(
 				x = "Length of vector"
 			) 
 	),
+	## Parallel Overhead ----
 	tar_target(parallel_overhead, {
-		move_square <- function(current){
-			rolls <- matrix(sample(seq(1, 6), 6, replace = TRUE), ncol = 2)
-			Total <- rowSums(rolls)
-			IsDouble <- rolls[,1] == rolls[,2]
-			if(IsDouble[1] && IsDouble[2] && IsDouble[3]) {
-				current <- 11L # integer! #<<
-			} else if (IsDouble[1] && IsDouble[2]) {
-				current <- current + sum(Total[1:3])
-			} else if (IsDouble[1]) {
-				current <- current + sum(Total[1:2])
-			} else {
-				current <- current + sum(Total[1])
-			}
-			if(current %% 40L == 0L) {
-				current <- 40L
-			} else {
-				current <- current %% 40L
-			}
-			as.integer(current)
-		}
 		initial <- sample(1:40, 1e5, replace = TRUE)
 		lengths <- c(1, 1e2, 1e3, 1e4, 5e4, 1e5)
 		#furrr::future_map_dfr(seq_along(lengths), ~{
@@ -468,7 +525,7 @@ list(
 				microbenchmark::microbenchmark(
 					"Parallel" = {
 						move <- furrr::future_map_int(
-							initial[1:n], move_square,
+							initial[1:n], move_square_better,
 							.options = furrr_options(seed = TRUE)
 						)
 					},
@@ -485,7 +542,7 @@ list(
 		# 	microbenchmark::microbenchmark(
 		# 		"Parallel" = {
 		# 			move <- furrr::future_map_int(
-		# 				initial[1:n], move_square,
+		# 				initial[1:n], move_square_better,
 		# 				.options = furrr_options(seed = TRUE)
 		# 			)
 		# 		},
@@ -501,7 +558,7 @@ list(
 			n <- lengths[.x]
 			microbenchmark::microbenchmark(
 				"Sequential" = {
-					move <- purrr::map_int(initial[1:n], move_square)
+					move <- purrr::map_int(initial[1:n], move_square_better)
 				},
 				times = 5
 			) %>% 
@@ -529,6 +586,30 @@ list(
 				linetype = "cores",
 				x = "Length of vector"
 			)
+	),
+	## Monopoly roll benchmarks -----
+	tar_target(
+		all_monopoly_compared, {
+			initial <- sample(1:40, 1e3, replace = TRUE)
+			# wierd interaction with Rcpp function being called in a child process?
+			# works when re-run here
+			Rcpp::cppFunction(Rcpp_monopoly_fun_str)
+			res <- microbenchmark::microbenchmark(
+				Rcpp_monopoly = {
+					sapply(initial, move_square_Rcpp)
+				},
+				bad_R_monopoly = {
+					sapply(initial, move_square_bad)
+				},
+				better_R_monopoly = {
+					sapply(initial, move_square_better)
+				},
+				opt_R_monopoly = {
+					sapply(initial, move_square_prob)
+				}
+			)
+			res
+		}
 	)
 )
 

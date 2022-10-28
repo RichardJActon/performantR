@@ -41,6 +41,7 @@ suppressPackageStartupMessages({
 	library(furrr)
 	library(xaringanthemer)
 	library(bigstatsr)
+	library(promises)
 })
 
 knitr::opts_chunk$set(
@@ -131,9 +132,9 @@ plot(qrcode::qr_code("https://github.com/RichardJActon/performantR"))
 
 ---
 
-# Performant R
+# Performant R - Overview
 
-- Profiling R to find bottlenecks with {[profvis](https://rstudio.github.io/profvis/)}
+- Profiling R to find bottlenecks with {[profvis](https://rstudio.github.io/profvis/)} & Other Measurements
 	- Beware premature optimisation!
 
 > "The real problem is that programmers have spent far too much time worrying about efficiency in the wrong places and at the wrong times; __premature optimization is the root of all evil (or at least most of it) in programming.__" - *_Donald Knuth - The Art of Computer Programming_*
@@ -145,7 +146,7 @@ plot(qrcode::qr_code("https://github.com/RichardJActon/performantR"))
 	- Slighly hacky hash tables
 - Coding efficiently != Writing efficient code
 	- Functional Programming in R
-- Parallel processing with {[future](https://cran.r-project.org/web/packages/future/vignettes/future-1-overview.html)}s
+- Parallelism, Concurrency, & Asynchrony with {[future](https://cran.r-project.org/web/packages/future/vignettes/future-1-overview.html)}s & {[promises](https://rstudio.github.io/promises/index.html)}
 - Caching computationally expensive results
 	- faster save and load with {[qs](https://github.com/traversc/qs)} & {[fst](https://www.fstpackage.org/)}
 	- Using pipeline managers {[targets](https://books.ropensci.org/targets/)}
@@ -174,12 +175,10 @@ plot(qrcode::qr_code("https://github.com/RichardJActon/performantR"))
 ]
 
 ```{r, profvis, panelset = TRUE}
-profvis::profvis(height = "400px",{
+profvis::profvis(height = "400px", interval = 0.001, {
 	n <- 1e6
 	df <- data.frame(
-		group = purrr::map_chr(
-			letters[1:10], ~(paste0(.x, collapse = ""))
-		),
+		group = letters[1:10],
 		value = rnorm(n) #<<
 	)
 	
@@ -204,7 +203,7 @@ profvis::profvis(height = "400px",{
 .panel[.panel-name[video demo]
 
 <center>
-<iframe width="80%" height="400px" src="https://www.youtube-nocookie.com/embed/rmnee9I2dvk" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+<iframe width="80%" height="400px" src="https://www.youtube-nocookie.com/embed/rmnee9I2dvk" title="YouTube video player" frameborder="0" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 </center>
 
 ]
@@ -571,74 +570,6 @@ tar_read(effect_length_vec_vs_df_plot) %>% plotly::ggplotly(height = 400)
 
 ---
 
-## Slightly Hacky hash tables
-
-- Hash tables let you rapidly find things by name
-- R does not have an 'ordinary' data structure that implements hash tables
-- R `environments` however can be hashed
-
-```{r}
-myenv <- new.env(hash = TRUE) 
-myenv$tmp <- "test"
-myenv$tmp
-```
-
-- `myenv` Can be used much like a named list but cannot be subset by index
-- nor can they be renamed like a list
-
-```{r, error=TRUE}
-myenv[1]; names(myenv)[1] <- "renamed"
-```
-
-.slug[`r slug`]
-
----
-
-## Constructing hashed environments
-
-- Environments must be constructed by iteration not directly from vectors
-
-```{r}
-keys <- c("A", "B", "C"); values <- 1:3
-purrr::walk2(keys, values, ~{myenv[[.x]] <- .y})
-ls(myenv)
-```
-
-- Constructing hashed environments is slow
-- Retrieving from them is very fast, irrespective of size
-
-.slug[`r slug`]
-
-???
-
-hashtables / hashmaps explanations
-
-Maybe show one of these in the longer workshop session, probably not a compsci audiance so might be valuable for understanding
-
-https://www.youtube.com/watch?v=KyUTuwz_b7Q
-
-https://www.youtube.com/watch?v=FhNJ6aikTVI
-
-hashtable performance in R
-
-https://www.r-bloggers.com/2015/03/hash-table-performance-in-r-part-i/
-
-https://blog.dominodatalab.com/a-quick-benchmark-of-hashtable-implementations-in-r
-
----
-
-## Performace Trade-offs in `R` hashtables
-
-- It is very quick to find things in a hashtable but...
-- It takes a long time to construct a hashtable
-
-```{r, echo=FALSE, fig.width=9, fig.height=3.5, fig.retina=3}
-tar_read(effect_of_vec_len_plot) %>% plotly::ggplotly(height = 430)
-```
-
-
----
-
 # $> EXERCISE - profiling
 
 The following code is for moving square in a simulated game of monopoly 
@@ -659,7 +590,8 @@ This example is lightly adapted from 'Efficient R programming' by Colin Gillespi
 .panelset[
 
 ```{r, slow_monopoly, panelset = TRUE}
-profvis(height = "450px", { initial <- sample(1:40, 1e3, replace = TRUE)
+profvis(height = "450px", interval = 0.001, {
+	initial <- sample(1:40, 1e3, replace = TRUE)
 	new <- integer(length = 1e3)
 	for (i in seq_along(initial)) {
 		current <- initial[i]
@@ -696,7 +628,8 @@ results for some reason.
 .panelset[
 
 ```{r, fast_monopoly, panelset = TRUE}
-profvis(height = "400px", {initial <- sample(1:40, 1e3, replace = TRUE)
+profvis(height = "400px", interval = 0.001, {
+	initial <- sample(1:40, 1e3, replace = TRUE)
 	new <- integer(length = 1e3)
 	for (i in seq_along(initial)) {
 		current <- initial[i]
@@ -760,6 +693,87 @@ attributes(mat) # all one type
 str(mat)
 ```
 
+---
+
+## Slightly Hacky hash tables
+
+- Hash tables let you rapidly find things by name
+- R does not have an 'ordinary' data structure that implements hash tables
+- R `environments` however can be hashed
+
+```{r}
+myenv <- new.env(hash = TRUE) 
+myenv$tmp <- "test"
+myenv$tmp
+```
+
+- `myenv` Can be used much like a named list but cannot be subset by index
+- nor can they be renamed like a list
+
+```{r, error=TRUE}
+myenv[1]; names(myenv)[1] <- "renamed"
+```
+
+.slug[`r slug`]
+
+---
+
+## Constructing hashed environments
+
+- Environments must be constructed by iteration not directly from vectors
+
+```{r}
+myenv <- new.env(hash = TRUE) 
+keys <- c("A", "B", "C"); values <- 1:3
+purrr::walk2(keys, values, ~{myenv[[.x]] <- .y})
+ls(myenv)
+```
+
+- Constructing hashed environments is slow
+- Retrieving from them is very fast, irrespective of size
+
+.slug[`r slug`]
+
+???
+
+hashtables / hashmaps explanations
+
+Maybe show one of these in the longer workshop session, probably not a compsci audiance so might be valuable for understanding
+
+https://www.youtube.com/watch?v=KyUTuwz_b7Q
+
+https://www.youtube.com/watch?v=FhNJ6aikTVI
+
+hashtable performance in R
+
+https://www.r-bloggers.com/2015/03/hash-table-performance-in-r-part-i/
+
+https://blog.dominodatalab.com/a-quick-benchmark-of-hashtable-implementations-in-r
+
+---
+
+## Performace Trade-offs in `R` hashtables
+
+- It is very quick to find things in a hashtable but...
+- It takes a long time to construct a hashtable
+
+```{r, echo=FALSE, fig.width=9, fig.height=3.5, fig.retina=3}
+tar_read(effect_of_vec_len_plot) %>% plotly::ggplotly(height = 430)
+```
+
+---
+
+## $> EXERCISE: Using hashes as an index
+
+Construct a data.frame with a character column
+
+Construct a hashed index in an environment
+
+use the environment to get the row indices and subset the date.frame
+
+compare the speed of this to the conventional approach
+
+.slug[`r slug`]
 
 ---
 
@@ -779,6 +793,18 @@ isOddCpp(42L); isOddCpp(69L)
 
 - The `cppFunction` lets you write simple in-line C++ functions and use them in R
 - This is possible with C, FORTRAN and even Rust `r emo::ji("crab")` but a lot more work
+
+.slug[`r slug`]
+
+---
+
+## $> EXERCISE: Write a basic Rccp function
+
+Just using the `cppFunction()` for now.
+
+Rcpp for everyone: https://teuder.github.io/rcpp4everyone_en/
+
+Re-writing R in Cpp: https://adv-r.hadley.nz/rcpp.html
 
 .slug[`r slug`]
 
@@ -815,7 +841,7 @@ x <- isOddCpp(3)
 .panelset[
 .panel[.panel-name[code]
 ```{r}
-cppFunction("int move_square(int current) {
+cppFunction("int move_square_Rcpp(int current) {
 	IntegerVector dice {1,2,3,4,5,6}; IntegerVector rolls = sample(dice, 2, true);
 	bool isDouble = rolls(0) == rolls(1);
 	if(isDouble) {
@@ -838,12 +864,12 @@ __Remember C++ has 0 based indexing! (unlike R)__
 .panel[.panel-name[Profiling {Rcpp} monopoly]
 The probability of a double is $\frac{1}{6}$ and of a triple $\frac{1}{36}$ so save time by only rolling them when they are needed.
 
-too fast for the profiler to measure well!
+too fast for the profiler to measure well with default interval!
 
 ```{r, Rcpp_monopoly, error=TRUE}
-profvis(height = "400px", {
+profvis(height = "400px", interval = 0.0005, {
 	initial <- sample(1:40, 1e3, replace = TRUE)
-	sapply(initial, move_square)
+	sapply(initial, move_square_Rcpp)
 })
 ```
 ]
@@ -851,13 +877,15 @@ profvis(height = "400px", {
 
 ```{r}
 initial <- sample(1:40, 1e3, replace = TRUE)
-res <- microbenchmark::microbenchmark(Rcpp_monopoly = {
-	sapply(initial, move_square)
-})
+res <- microbenchmark::microbenchmark(
+	Rcpp_monopoly = {
+		sapply(initial, move_square_Rcpp)
+	}
+)
 res
 ```
 
-~2ms down from ~20ms in improved `R` and from ~240ms un-optimised `R`
+~2ms down from ~15ms in improved `R` and from ~225ms un-optimised `R`
 
 ]
 ]
@@ -885,6 +913,46 @@ For those of us used the the safety of an interpreted language like `R` C++ can 
 I exaggerate, but if you don't know the language you can spend hours trying to fix something relatively simple when a little clever tweak in R might have got you almost as much performance gain.
 
 Developer time and the ability for future people, (including future you), to maintain your code must be considered as well as compute time.
+
+.slug[`r slug`]
+
+---
+
+## But...
+
+
+.panelset[
+.panel[.panel-name[more optimal R function]
+
+```{r}
+move_square_prob <- function(current) {
+	dice <- 1L:6L; rolls <- sample(dice, 2L, replace = TRUE)
+	isDouble <- rolls[1] == rolls[2]
+	if (isDouble) {
+		rolls2 <- sample(dice, 2L, replace = TRUE)
+		isDouble2 <- rolls2[1] == rolls2[2]
+		if (isDouble2) {
+			rolls3 <- sample(dice, 2L, replace = TRUE)
+			isDouble3 <- rolls3[1] == rolls3[2]
+			if(isDouble3) { current <- 11L; return(current) }
+		} else { current <- current + sum(rolls2) }
+	}
+	current <- current + sum(rolls)
+	if(current %% 40L == 0L) { return(current) } else { return(current %% 40L) }
+	return(current)
+}
+
+```
+
+]
+.panel[.panel-name[All Results]
+
+```{r, echo=FALSE}
+tar_read(all_monopoly_compared)
+```
+
+]
+]
 
 .slug[`r slug`]
 
@@ -1095,7 +1163,7 @@ https://www.youtube.com/watch?v=Vt6f3qMehXI
 
 .panelset[
 .panel[.panel-name[parallel processing]
-- There a variety of ways to do parallel and asynchronous processing in R
+- There are a variety of ways to do parallel and asynchronous processing in R
 - {[future](https://future.futureverse.org/)} provides a nice consistent interface to many of them, it is usually best to use it for this reason.
 	- {[foreach](https://cran.r-project.org/web/packages/foreach/vignettes/foreach.html)} remains popular and has compatability with {[future](https://future.futureverse.org/)}
 	- Avoid using base {parallel} `mclappy` etc. as these are not cross platform
@@ -1108,12 +1176,12 @@ https://www.youtube.com/watch?v=Vt6f3qMehXI
 ]
 .panel[.panel-name[{foreach} and why to use the {future} API]
 <center>
-<iframe width="65%" height="375px" src="https://www.youtube-nocookie.com/embed/GC5VXjc52t0" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+<iframe width="65%" height="375px" src="https://www.youtube-nocookie.com/embed/GC5VXjc52t0" title="YouTube video player" frameborder="0" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 </center>
 ]
 .panel[.panel-name[{[future](https://future.futureverse.org/)} & {[progressr](https://progressr.futureverse.org/)}]
 <center>
-<iframe width="65%" height="375px" src="https://www.youtube-nocookie.com/embed/FRF0c0Wls3E" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+<iframe width="65%" height="375px" src="https://www.youtube-nocookie.com/embed/FRF0c0Wls3E" title="YouTube video player" frameborder="0" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 </center>
 ]
 ]
@@ -1309,31 +1377,6 @@ Add your ssh key to the agent in a terminal session: e.g. `ssh-add ~/.ssh/id_rsa
 
 ---
 
-# Async, Blocking & Promises
-
-- A simple `future` assignment is blocking
-	- The main R process is tied up waiting for the future to finish and return a result
-- How do we get our main R process back to do other things while we wait?
-
-{Promises}
-
-```{r}
-res <- NULL
-prms <- promises::future_promise({Sys.sleep(1); "Woke Up!"})
-then(prms, function(value) {res <<- value})
-prms # Not done yet
-res # Still NULL
-2+2 # Free to do other things
-Sys.sleep(3)
-prms # All Done!
-res # Now has the promised value
-```
-
-
-.slug[`r slug`]
-
----
-
 ### Configuring HPC for {future.batchtools} with Slurm
 
 To begin dispatching jobs from within R scripts you need to configure {future.batchtools}
@@ -1352,6 +1395,66 @@ Templates for these files are [R_on_cheops](./R_on_cheops)
 If you want to work interactively with the scheduler and use RStudio then I would recommend starting RStudio on a head node or in an interactive job in a terminal multiplexer such as [screen](https://www.putorius.net/linux-screen-command.html) or [tmux](https://www.howtogeek.com/671422/how-to-use-tmux-on-linux-and-why-its-better-than-screen/) then connecting via ssh port forwarding. SSH port forwarding means that the rendering of the UI is done client-side not server-side as with X11 forwarding so the experience of using a GUI is much smoother. The terminal multiplexer will keep the RStudio server job running even if your connection is lost so you can reconnect without losing your session.
 
 see: R_on_cheops/cheops_R_remote.nb.html
+
+---
+
+# Async, Blocking & Promises
+
+- A simple `future` assignment is blocking
+	- The main R process is tied up waiting for the future to finish and return a result
+- How do we get our main R process back to do other things while we wait?
+
+{[promises](https://rstudio.github.io/promises/index.html)}
+
+.pull-left[
+
+```{r}
+res <- NULL
+prms <- future_promise({
+	Sys.sleep(1); "Woke Up!"
+})
+then(prms, function(value) {res <<- value})
+prms # Not done yet
+res # Still NULL
+Sys.sleep(3)
+```
+
+]
+
+.pull-right[
+
+```{r}
+2+2 # Free to do other things
+prms # All Done!
+res # Now has the promised value
+```
+
+]
+
+.slug[`r slug`]
+
+---
+
+## $> EXERCISE: Play with promises
+
+Try out the `%...>%` operator.
+
+```{r}
+fx <- \(x){Sys.sleep(x); x}
+future_promise(2) %...>% fx() %...>% {px <<- .}
+px
+```
+
+They are a bit counter intuitive as once you have made a promise it's hard to escape you always get another promise back.
+
+This is intentional so that you can chain them together, they are often used in contexts where you don't explicitly need the result back your are just giving a promise to something that understands how to handle them.
+
+For instance {Shiny} is 'aware' of promises and using them in conjunction with {future} can be very effective at reducing unresponsive UI issues in {Shiny} apps.
+
+This is cover specifically in this vignette: 
+[Using `promises` with Shiny](https://rstudio.github.io/promises/articles/shiny.html)
+
+.slug[`r slug`]
 
 ---
 
@@ -1407,7 +1510,7 @@ Reading reading a matrix into base R loads all the data into memory by default s
 .panel[.panel-name[Video]
 
 <center>
-<iframe width="80%" height="400px" src="https://www.youtube-nocookie.com/embed/UXKYqpAo6cs" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+<iframe width="80%" height="400px" src="https://www.youtube-nocookie.com/embed/UXKYqpAo6cs" title="YouTube video player" frameborder="0" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 </center>
 
 ]
@@ -1447,6 +1550,16 @@ with fst you can do things somewhat similarly to a bigmatrix only reading the ro
 
 ---
 
+## $> EXERCISE: Benchmark {[qs](https://github.com/traversc/qs)}/{[fst](https://www.fstpackage.org/)}
+
+Compare `saveRDS()`/`readRDS()` to their equivalents in {[qs](https://github.com/traversc/qs)}/{[fst](https://www.fstpackage.org/)}
+
+Read only the first column of a data.frame saved as an `.fst` file and compare the speed / memory use of this to trying to do the equivalent with an ordinary flat file such as a `.csv`
+
+.slug[`r slug`]
+
+---
+
 # ‘Efficienct’ coding is not all about performance
 
 - If future you / future maintainers of your code can’t understand your optimised code to fix it when it breaks is it really efficient?
@@ -1458,6 +1571,8 @@ with fst you can do things somewhat similarly to a bigmatrix only reading the ro
 	- Simple and self-contained
 	- __Well Documented__
 	- Unit tests
+
+> devtime vs runtime
 
 .slug[`r slug`]
 
@@ -1683,7 +1798,7 @@ targets::tar_visnetwork()
 .panel[.panel-name[Video]
 
 <center>
-<iframe width="80%" height="400px" src="https://www.youtube-nocookie.com/embed/FODSavXGjYg" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+<iframe width="80%" height="400px" src="https://www.youtube-nocookie.com/embed/FODSavXGjYg" title="YouTube video player" frameborder="0" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 </center>
 
 ]
@@ -1699,6 +1814,30 @@ https://books.ropensci.org/targets/
 
 ---
 
+## Free task parallelism!
+
+Because {targets} understands the dependency relationships between individual steps in an analysis it can automatically evaluate independent tasks in parallel.
+
+If you declare a plan in your `_targets.R` file before your list of targets then use the `tar_make_future()` function instead of `tar_make()` this is all that's needed.
+
+Parallelism within jobs is also possible, just include multiple levels in your plan and use {future} functions in your targets. 
+
+.slug[`r slug`]
+
+---
+
+## $> EXERCISE: create a simple targets pipeline
+
+BONUS: 
+
+- Make a target that reads an input file and becomes invalid when the file in changes.
+- Include an Rmarkdown report as a target output
+	(Note the changing the `.Rmd` file invalidates the target)
+s
+.slug[`r slug`]
+
+---
+
 # Additional Resources
 
 There are references and additional resources in the presenters notes throughout this presentation as wells as some extra stuff in the github repo.
@@ -1706,7 +1845,7 @@ There are references and additional resources in the presenters notes throughout
 In depth walk through example of optimising `R` code for a network analysis
 
 <center>
-<iframe width="80%" height="400px" src="https://www.youtube-nocookie.com/embed/78icyDMZJyQ" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+<iframe width="80%" height="400px" src="https://www.youtube-nocookie.com/embed/78icyDMZJyQ" title="YouTube video player" frameborder="0" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
 </center>
 
 .slug[`r slug`]
