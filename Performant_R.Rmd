@@ -175,7 +175,7 @@ plot(qrcode::qr_code("https://github.com/RichardJActon/performantR"))
 ]
 
 ```{r, profvis, panelset = TRUE}
-profvis::profvis(height = "400px", interval = 0.001, {
+profvis::profvis(height = "400px", interval = 0.005, {
 	n <- 1e6
 	df <- data.frame(
 		group = letters[1:10],
@@ -590,7 +590,7 @@ This example is lightly adapted from 'Efficient R programming' by Colin Gillespi
 .panelset[
 
 ```{r, slow_monopoly, panelset = TRUE}
-profvis(height = "450px", interval = 0.001, {
+profvis(height = "450px", interval = 0.005, {
 	initial <- sample(1:40, 1e3, replace = TRUE)
 	new <- integer(length = 1e3)
 	for (i in seq_along(initial)) {
@@ -628,7 +628,7 @@ results for some reason.
 .panelset[
 
 ```{r, fast_monopoly, panelset = TRUE}
-profvis(height = "400px", interval = 0.001, {
+profvis(height = "400px", interval = 0.005, {
 	initial <- sample(1:40, 1e3, replace = TRUE)
 	new <- integer(length = 1e3)
 	for (i in seq_along(initial)) {
@@ -878,7 +878,7 @@ The probability of a double is $\frac{1}{6}$ and of a triple $\frac{1}{36}$ so s
 too fast for the profiler to measure well with default interval!
 
 ```{r, Rcpp_monopoly, error=TRUE}
-profvis(height = "400px", interval = 0.0005, {
+profvis(height = "400px", interval = 0.005, {
 	initial <- sample(1:40, 1e3, replace = TRUE)
 	sapply(initial, move_square_Rcpp)
 })
@@ -920,6 +920,8 @@ https://www.youtube.com/watch?v=spVVjrgHHNU
 ### Take care when choosing the C++ Route `r emo::ji("foot")` `r emo::ji("gun")`
 
 For those of us used the the safety of an interpreted language like `R` C++ can be a bit of a foot-gun if we try and get fancy. All kinds of nightmarish memory bugs lurk in the shadows to acost the unwary traveler in these foreign lands. Only venture here when needs must and preferably accompanied by a seasoned veteran of the `C` languages who can sniff out a dangling pointer from 3 miles hence.
+
+Ah! memory leak! `r emo::ji("brain")` `r emo::ji("sweat_drops")` Run!
 
 I exaggerate, but if you don't know the language you can spend hours trying to fix something relatively simple when a little clever tweak in R might have got you almost as much performance gain.
 
@@ -1049,7 +1051,7 @@ format(object.size(M), "Kb")
 - `dplyr::if_else()` is faster than `base::ifelse()`
 - Vectorised operations can be faster than either
 - looping over `if(){}else{}` and `switch` is slow
-	- But may have and edge when `length == 1
+	- But may have and edge when `length == 1`
 
 ]
 
@@ -1100,6 +1102,203 @@ tar_read(partial_sort_plot) %>% plotly::ggplotly()
 ```
 
 .slug[`r slug`]
+
+---
+
+# ‘Efficienct’ coding is not all about performance
+
+- If future you / future maintainers of your code can’t understand your optimised code to fix it when it breaks is it really efficient?
+- Consider development time as well as execution time.
+	- Is it a good use of time to spend 5 hours re-writing a piece of code that you will run 5 times total and takes 5 minutes to run in R in C++ so it runs in 20s?
+- `R` is fast to write, and relatively easy to comprehend but can be slow to run
+
+- optimise for developer and maintainer time when writing your code
+	- Simple and self-contained
+	- __Well Documented__
+	- Unit tests
+
+> devtime vs runtime
+
+.slug[`r slug`]
+
+???
+
+devtime vs runtime
+https://www.youtube.com/watch?v=ttJCwzfsAc8
+
+---
+
+# Functional Programming in R
+
+- R is often written in *imperative* style
+	- Typically involves loops and modifications to global state
+	- Good for many problems but often does not scale well to larger code bases
+		- namespace gets cluttered with many objects
+		- Out of order execution in interactive environments can cause inconsistent state
+
+- S the language from which R evolved began as purely *functional* (loops were added later).
+	- So `R` has a functional heritage but is not optimised for recursion like e.g. `haskell`
+
+- Functional Style
+	- Makes heavier use of lexical scope, thus fewer globals
+	- Makes a series of transformations to inputs 'pipeline-able'
+
+- Map/Reduce & The {purrr} library
+	- more consistent API then `apply`
+	- better 'type saftey' (insofar as that is a thing in R)
+
+.slug[`r slug`]
+
+???
+
+"The Joy of Functional Programming (for Data Science)" with Hadley Wickham
+https://www.youtube.com/watch?v=bzUmK0Y07ck
+
+[DSC 4.0] What Makes a Good Function - Hadley Wickham keynote
+https://www.youtube.com/watch?v=Qne86lxjgtg
+
+---
+
+## Imperative Vs Functional
+
+.pull-left[
+Imperative Style
+```{r}
+resulti <- character(length = length(letters))
+names(resulti) <- LETTERS
+for (i in seq_along(letters)) {
+	resulti[i] <- paste0(letters[i], i)
+}
+head(resulti)
+```
+
+3 assignments, 2 subsets, 1 set length, 3 'lines'
+
+]
+
+.pull-right[
+'Functional' Style
+```{r}
+resultf <- letters %>%
+	purrr::set_names(LETTERS) %>%
+	purrr::map2_chr(
+		., seq_along(.),
+		~paste0(.x, .y)
+	)
+head(resultf)
+```
+
+1 assignment, 0 subsets, 0 set length, 1 'line'
+
+]
+
+.slug[`r slug`]
+
+???
+
+---
+
+## Advantages of Functions
+
+### Why Write Functions?
+- Testable
+- Reusable / Portable / Self-contained
+	- lexical scoping reduces the complexity of the state of the program which often grows very large in imperative style
+
+### Good Functions
+- __Referential Transparency__ (no globals or side effects just params)
+- Endomorphism (same form as input and output)
+- Simple / Single Purpose
+
+.slug[`r slug`]
+
+---
+
+## What makes a good function?
+
+.pull-left[
+
+__BAD__ Function `r emo::ji("rage")`
+
+```{r}
+globalx <- 0L; globaly <- 20
+fun1 <- function(x = 1) {
+	while (globalx < globaly) {
+		globalx <<- globalx + x
+	}
+}
+fun1()
+globalx
+```
+
+Not-referentially transparent, has global side-effects
+
+]
+
+.pull-right[
+__GOOD__ Function `r emo::ji("innocent")`
+
+```{r}
+globalx <- 0L; globaly <- 20
+fun2 <- function(
+	init = 0L, increment = 1, maxv = 20
+) {
+	while (init < maxv) {
+		init <- init + increment
+	}
+	init
+}
+globalx <- fun2(globalx, maxv = globaly)
+globalx
+```
+
+Referentially transparent, has No global side-effects
+
+]
+
+Nothing except the parameter values affect the output of the function
+Nothing in the environment is changed by the function, except by its return value
+
+.slug[`r slug`]
+
+---
+
+## Good Functions are *usually* easier to parallelise
+
+Many side effects can be a problem if they happen in the wrong order or try to modify the same thing.
+
+Global values are not always accessible to parallel processes so specifying everything as a parameter avoids this issue.
+
+.slug[`r slug`]
+
+---
+
+
+## `%>%` ceci n'est pas une pipe {[magrittr](https://magrittr.tidyverse.org/)}
+
+Pipes are a useful tool for taking the output of one function and giving it to another. Let's say we want to do a series of operations on a vector each of which is a function.
+
+```{r}
+x <- rnorm(10)
+sum(sqrt(abs(x)))
+```
+
+We take the absolute value of x with `abs()`, the square root of each with `sqrt()` and then the sum of the square roots with `sum()`. 
+
+In the code the order is reversed from it's order in the verbal description.
+Reading starts from the outside with `sum` but the logical order of the operations starts with x and works outwards.
+
+```{r}
+x %>% abs() %>% sqrt() %>% sum()
+```
+
+Using the pipe `%>%` from the {[magrittr](https://magrittr.tidyverse.org/)} package you can invert this order, and instead write your code in the order that you might describe or __speak__ what you are doing.
+
+.slug[`r slug`]
+
+???
+
+https://magrittr.tidyverse.org/logo.png
 
 ---
 
@@ -1569,192 +1768,6 @@ Compare `saveRDS()`/`readRDS()` to their equivalents in {[qs](https://github.com
 Read only the first column of a data.frame saved as an `.fst` file and compare the speed / memory use of this to trying to do the equivalent with an ordinary flat file such as a `.csv`
 
 .slug[`r slug`]
-
----
-
-# ‘Efficienct’ coding is not all about performance
-
-- If future you / future maintainers of your code can’t understand your optimised code to fix it when it breaks is it really efficient?
-- Consider development time as well as execution time.
-	- Is it a good use of time to spend 5 hours re-writing a piece of code that you will run 5 times total and takes 5 minutes to run in R in C++ so it runs in 20s?
-- `R` is fast to write, and relatively easy to comprehend but can be slow to run
-
-- optimise for developer and maintainer time when writing your code
-	- Simple and self-contained
-	- __Well Documented__
-	- Unit tests
-
-> devtime vs runtime
-
-.slug[`r slug`]
-
-???
-
-devtime vs runtime
-https://www.youtube.com/watch?v=ttJCwzfsAc8
-
----
-
-# Functional Programming in R
-
-- R is often written in *imperative* style
-	- Typically involves loops and modifications to global state
-	- Good for many problems but often does not scale well to larger code bases
-		- namespace gets cluttered with many objects
-		- Out of order execution in interactive environments can cause inconsistent state
-
-- S the language from which R evolved began as purely *functional* (loops were added later).
-	- So `R` has a functional heritage but is not optimised for recursion like e.g. `haskell`
-
-- Functional Style
-	- Makes heavier use of lexical scope, thus fewer globals
-	- Makes a series of transformations to inputs 'pipeline-able'
-
-- Map/Reduce & The {purrr} library
-	- more consistent API then `apply`
-	- better 'type saftey' (insofar as that is a thing in R)
-
-.slug[`r slug`]
-
-???
-
-"The Joy of Functional Programming (for Data Science)" with Hadley Wickham
-https://www.youtube.com/watch?v=bzUmK0Y07ck
-
-[DSC 4.0] What Makes a Good Function - Hadley Wickham keynote
-https://www.youtube.com/watch?v=Qne86lxjgtg
-
----
-
-## Imperative Vs Functional
-
-.pull-left[
-Imperative Style
-```{r}
-resulti <- character(length = length(letters))
-names(resulti) <- LETTERS
-for (i in seq_along(letters)) {
-	resulti[i] <- paste0(letters[i], i)
-}
-head(resulti)
-```
-
-3 assignments, 2 subsets, 1 set length, 3 'lines'
-
-]
-
-.pull-right[
-'Functional' Style
-```{r}
-resultf <- letters %>%
-	purrr::set_names(LETTERS) %>%
-	purrr::map2_chr(
-		., seq_along(.),
-		~paste0(.x, .y)
-	)
-head(resultf)
-```
-
-1 assignment, 0 subsets, 0 set length, 1 'line'
-
-]
-
-.slug[`r slug`]
-
-???
-
----
-
-## Advantages of Functions
-
-### Why Write Functions?
-- Testable
-- Reusable / Portable / Self-contained
-	- lexical scoping reduces the complexity of the state of the program which often grows very large in imperative style
-
-### Good Functions
-- __Referential Transparency__ (no globals or side effects just params)
-- Endomorphism (same form as input and output)
-- Simple / Single Purpose
-
-.slug[`r slug`]
-
----
-
-## What makes a good function?
-
-.pull-left[
-
-__BAD__ Function `r emo::ji("rage")`
-
-```{r}
-globalx <- 0L; globaly <- 20
-fun1 <- function(x = 1) {
-	while (globalx < globaly) {
-		globalx <<- globalx + x
-	}
-}
-fun1()
-globalx
-```
-
-Not-referentially transparent, has global side-effects
-
-]
-
-.pull-right[
-__GOOD__ Function `r emo::ji("innocent")`
-
-```{r}
-globalx <- 0L; globaly <- 20
-fun2 <- function(
-	init = 0L, increment = 1, maxv = 20
-) {
-	while (init < maxv) {
-		init <- init + increment
-	}
-	init
-}
-globalx <- fun2(globalx, maxv = globaly)
-globalx
-```
-
-Referentially transparent, has No global side-effects
-
-]
-
-Nothing except the parameter values affect the output of the function
-Nothing in the environment is changed by the function, except by its return value
-
-.slug[`r slug`]
-
----
-
-## `%>%` ceci n'est pas une pipe {[magrittr](https://magrittr.tidyverse.org/)}
-
-Pipes are a useful tool for taking the output of one function and giving it to another. Let's say we want to do a series of operations on a vector each of which is a function.
-
-```{r}
-x <- rnorm(10)
-sum(sqrt(abs(x)))
-```
-
-We take the absolute value of x with `abs()`, the square root of each with `sqrt()` and then the sum of the square roots with `sum()`. 
-
-In the code the order is reversed from it's order in the verbal description.
-Reading starts from the outside with `sum` but the logical order of the operations starts with x and works outwards.
-
-```{r}
-x %>% abs() %>% sqrt() %>% sum()
-```
-
-Using the pipe `%>%` from the {[magrittr](https://magrittr.tidyverse.org/)} package you can invert this order, and instead write your code in the order that you might describe or __speak__ what you are doing.
-
-.slug[`r slug`]
-
-???
-
-https://magrittr.tidyverse.org/logo.png
 
 ---
 
