@@ -1,0 +1,33 @@
+{
+  "@renku_data_type": "renku.domain_model.project.Project",
+  "@renku_oid": "project",
+  "agent_version": "1.8.1",
+  "annotations": [],
+  "automated_update": true,
+  "creator": {
+    "@renku_data_type": "renku.domain_model.provenance.agent.Person",
+    "@renku_data_value": {
+      "affiliation": null,
+      "alternate_name": null,
+      "email": "richardjacton@pm.me",
+      "id": "mailto:richardjacton@pm.me",
+      "name": "Richard J. Acton"
+    }
+  },
+  "date_created": {
+    "@renku_data_type": "datetime.datetime",
+    "@renku_data_value": "2022-11-02T09:36:28+00:00"
+  },
+  "description": null,
+  "id": "/projects/RichardJActon/performantr",
+  "immutable_template_files": [],
+  "keywords": [],
+  "minimum_renku_version": "1.7.0",
+  "name": "performantR",
+  "template_id": "bioc-minimal",
+  "template_metadata": "{\"__template_source__\": \"renku\", \"__template_ref__\": \"0.3.1\", \"__template_id__\": \"bioc-minimal\", \"__namespace__\": \"RichardJActon\", \"__sanitized_project_name__\": \"\", \"__repository__\": \"\", \"__project_slug__\": \"\", \"__project_description__\": null, \"__renku_version__\": \"1.8.1\", \"__name__\": \"performantR\", \"name\": \"performantR\", \"__template_version__\": \"0.3.1\", \"__automated_update__\": true}",
+  "template_ref": "0.3.1",
+  "template_source": "renku",
+  "template_version": "0.3.1",
+  "version": 9
+}
