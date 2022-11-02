@@ -5,13 +5,13 @@ setwd('/home/rstudio')
 options(renv.consent = TRUE)
 write("options(renv.consent = TRUE)", file="/home/rstudio/.Rprofile", append = TRUE)
 install.packages(
-		     ##!! Update to match version in lock file if you upgrade renv
-		     # current release:
-		     'https://cran.r-project.org/src/contrib/renv_0.15.5.tar.gz', 
-		         # older versions:
-		         # 'https://cran.r-project.org/src/contrib/Archive/renv/renv_0.15.4.tar.gz', 
-		         repos = NULL, type = 'source', dependencies = TRUE
-		     )
+	##!! Update to match version in lock file if you upgrade renv
+	# current release:
+	# 'https://cran.r-project.org/src/contrib/renv_0.15.6.tar.gz', 
+	# older versions:
+	'https://cran.r-project.org/src/contrib/Archive/renv/renv_0.15.5.tar.gz', 
+	repos = NULL, type = 'source', dependencies = TRUE
+)
 renv::init(force = TRUE)
 renv::restore(confirm = FALSE)
 
