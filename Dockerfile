@@ -28,6 +28,10 @@ COPY install.R /tmp/
 COPY renv.lock /home/rstudio/renv.lock
 RUN R -f /tmp/install.R
 
+# apply a custom RStudio config
+# copy ~/.config/rstudio to .rstudio_config_dir to reserved changes when rebuilding the container
+COPY .rstudio_config_dir/ /home/rstudio/.config/rstudio
+
 ## Clean up the /home/rstudio directory to avoid confusion in nested R projects
 RUN rm /home/rstudio/.Rprofile; rm /home/rstudio/renv.lock
 
