@@ -9,16 +9,27 @@ FROM renku/renkulab-bioc:RELEASE_3_14-0.11.1
 # e.g. the following installs apt-utils and vim; each pkg on its own line, all lines
 # except for the last end with backslash '\' to continue the RUN line
 #
-# USER root
-# RUN apt-get update && \
-#    apt-get install -y --no-install-recommends \
-#    apt-utils \
-#    vim
-# USER ${NB_USER}
+USER root
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    libncurses5-dev \
+    libncursesw5-dev \
+    parallel \
+    libgit2-dev \
+    tk-dev \
+    vim \
+    libpq5 openssh-client openssh-server \
+    libxml2 libxml2-dev libglpk-dev libxt-dev
+
+USER ${NB_USER}
 
 # install the R dependencies
 COPY install.R /tmp/
+COPY renv.lock /home/rstudio/renv.lock
 RUN R -f /tmp/install.R
+
+## Clean up the /home/rstudio directory to avoid confusion in nested R projects
+RUN rm /home/rstudio/.Rprofile; rm /home/rstudio/renv.lock
 
 # install the python dependencies
 COPY requirements.txt /tmp/
