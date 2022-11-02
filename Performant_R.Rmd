@@ -695,9 +695,20 @@ str(mat)
 
 ---
 
+## What are hash tables?
+
+Hash tables let you rapidly find things by name, here's how:
+
+<center>
+<iframe width="65%" height="375px" src="https://www.youtube-nocookie.com/embed/KyUTuwz_b7Q" title="YouTube video player" frameborder="0" allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+</center>
+
+.slug[`r slug`]
+
+---
+
 ## Slightly Hacky hash tables
 
-- Hash tables let you rapidly find things by name
 - R does not have an 'ordinary' data structure that implements hash tables
 - R `environments` however can be hashed
 
@@ -1440,6 +1451,7 @@ res # Now has the promised value
 Try out the `%...>%` operator.
 
 ```{r}
+px <- NULL
 fx <- \(x){Sys.sleep(x); x}
 future_promise(2) %...>% fx() %...>% {px <<- .}
 px
