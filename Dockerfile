@@ -17,7 +17,7 @@ RUN apt-get update && \
     parallel \
     libgit2-dev \
     tk-dev \
-    vim \
+    vim less htop ncdu tree \
     libpq5 openssh-client openssh-server \
     libxml2 libxml2-dev libglpk-dev libxt-dev
 
