@@ -13,6 +13,7 @@ install.packages(
 	repos = NULL, type = 'source', dependencies = TRUE
 )
 renv::init(force = TRUE)
+setwd("~/work/performantR")
 renv::restore(confirm = FALSE)
 
 # Uncomment and adapt to install additional R dependencies.
