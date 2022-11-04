@@ -1053,6 +1053,14 @@ format(object.size(M), "Kb")
 - looping over `if(){}else{}` and `switch` is slow
 	- But may have and edge when `length == 1`
 
+```{r, eval=FALSE}
+marks <- sample(1:100, 1000, replace = TRUE)
+n <- 1000
+# Vector - fastest solution
+results <- rep("fail", length(marks[1:n]))
+results[marks[1:n] >= 40] <- "pass"
+```
+
 ]
 
 .pull-right[
