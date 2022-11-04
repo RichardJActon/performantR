@@ -152,7 +152,9 @@
     "bench": {
       "Package": "bench",
       "Version": "1.1.2",
-      "Source": "Repository"
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "96fdc9419a103087fd765e896299e67f"
     },
     "bigassertr": {
       "Package": "bigassertr",
@@ -391,7 +393,9 @@
     "future": {
       "Package": "future",
       "Version": "1.28.0",
-      "Source": "Repository"
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "f3e26a942d4ee32cec9403e1ddd7000b"
     },
     "future.callr": {
       "Package": "future.callr",
@@ -423,10 +427,10 @@
     },
     "globals": {
       "Package": "globals",
-      "Version": "0.14.0",
+      "Version": "0.16.1",
       "Source": "Repository",
       "Repository": "RSPM",
-      "Hash": "eca8023ed5ca6372479ebb9b3207f5ae"
+      "Hash": "e14798793892c6bebdbe2f144aacf6e6"
     },
     "glue": {
       "Package": "glue",
@@ -631,10 +635,10 @@
     },
     "parallelly": {
       "Package": "parallelly",
-      "Version": "1.31.0",
+      "Version": "1.32.1",
       "Source": "Repository",
       "Repository": "RSPM",
-      "Hash": "ceef6586b2539fd15f4cdf87061bfa04"
+      "Hash": "9e3d8d65cb9c5ca5966340a6bfec60b2"
     },
     "pillar": {
       "Package": "pillar",
@@ -835,7 +839,9 @@
     "tictoc": {
       "Package": "tictoc",
       "Version": "1.1",
-      "Source": "Repository"
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Hash": "e1a2cb41e4be769a941c90c11469db90"
     },
     "tidyr": {
       "Package": "tidyr",
@@ -908,9 +914,7 @@
     "visNetwork": {
       "Package": "visNetwork",
       "Version": "2.1.2",
-      "Source": "Repository",
-      "Repository": "RSPM",
-      "Hash": "3e48b097e8d9a91ecced2ed4817a678d"
+      "Source": "Repository"
     },
     "vroom": {
       "Package": "vroom",
