@@ -1103,7 +1103,7 @@ toc()
 
 - The default sorting algorithm 'radix' is fastest of the sort methods
 - `sort(x, decreasing = TRUE)` may be marginally quicker than `rev(sort(x))`, negligible in my testing
-- If you just need part of sort done e.g. the top 10 
+- If you just need part of sort done e.g. the top 10 this can be faster especially for strings `sort(x, partial = 1:10)`
 
 ```{r, echo=FALSE}
 tar_read(partial_sort_plot) %>% plotly::ggplotly()
