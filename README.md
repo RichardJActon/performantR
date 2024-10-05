@@ -5,7 +5,7 @@ _Doing things faster with R_
 
 This extended workshop offers advice, tips & tricks and exercises to optimise and improve the performance of R code.
 
-It is intended as a starting point and links out to many additional resources for those wishing to go deeper on specic topics 
+It is intended as a starting point and links out to many additional resources for those wishing to go deeper on specific topics 
 Checkout the files in the repo and the presenters notes for additional resources (press `p` to see these in the slides)
 
 The [slides](https://richardjacton.github.io/performantR/Performant_R.html) can be found here.
