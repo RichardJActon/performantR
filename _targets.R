@@ -17,7 +17,7 @@ tar_option_set(packages = c(
 	"furrr",
 	"microbenchmark"
 ))
-plan(list(tweak(callr, workers = 1), tweak(multisession, workers = 12)))
+plan(list(tweak(callr, workers = 1), tweak(multisession, workers = 4)))
 # Parallelism ----
 # with`plan(callr)`
 # invoke the pipeline with `tar_make_future(N)`, where N is the number of
@@ -26,7 +26,7 @@ plan(list(tweak(callr, workers = 1), tweak(multisession, workers = 12)))
 # dependencies will begin evaluation once their parents are done.
 # A custom plan can be specified when you have nested futures within 
 # individual targets
-
+fut_opts <- furrr_options(seed = TRUE)
 # Functions ----
 
 move_square_bad <- function(current) {
@@ -211,7 +211,7 @@ list(
 					
 					dplyr::bind_rows(lst,lstr)
 					
-				}, seed = TRUE)
+				}, .options = fut_opts)
 			#effect_of_vec_len <- dplyr::bind_rows(lst,lstr)
 			#effect_of_vec_len
 		},
@@ -483,7 +483,7 @@ list(
 						#regex = "(\\w+)_method_(\\w+)_(\\w+)",
 						remove = FALSE
 					)
-			})
+			}, .options = fut_opts)
 		}
 	),
 	tar_target(
@@ -526,7 +526,7 @@ list(
 					"Parallel" = {
 						move <- furrr::future_map_int(
 							initial[1:n], move_square_better,
-							.options = furrr_options(seed = TRUE)
+							.options = fut_opts
 						)
 					},
 					times = 5
