@@ -4,7 +4,7 @@
     "Repositories": [
       {
         "Name": "CRAN",
-        "URL": "https://packagemanager.rstudio.com/all/latest"
+        "URL": "https://packagemanager.rstudio.com/cran/2023-06-09"
       }
     ]
   },
@@ -423,10 +423,9 @@
     },
     "globals": {
       "Package": "globals",
-      "Version": "0.14.0",
+      "Version": "0.16.0",
       "Source": "Repository",
-      "Repository": "RSPM",
-      "Hash": "eca8023ed5ca6372479ebb9b3207f5ae"
+      "Repository": "RSPM"
     },
     "glue": {
       "Package": "glue",
@@ -631,10 +630,9 @@
     },
     "parallelly": {
       "Package": "parallelly",
-      "Version": "1.31.0",
+      "Version": "1.32.1",
       "Source": "Repository",
-      "Repository": "RSPM",
-      "Hash": "ceef6586b2539fd15f4cdf87061bfa04"
+      "Repository": "RSPM"
     },
     "pillar": {
       "Package": "pillar",

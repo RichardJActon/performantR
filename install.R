@@ -13,8 +13,8 @@ install.packages(
 	repos = NULL, type = 'source', dependencies = TRUE
 )
 renv::init(force = TRUE)
-renv::restore(confirm = FALSE)
-
+# renv::restore(confirm = FALSE)
+renv::restore(repos = "https://packagemanager.posit.co/cran/2023-06-09", confirm = FALSE)
 # Uncomment and adapt to install additional R dependencies.
 # The installed packages will not be included in the project's renv.lock file
 # unless you call renv::snapshot() and commit the changes.
