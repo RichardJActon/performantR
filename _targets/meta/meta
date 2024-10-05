@@ -1,24 +1,25 @@
 name|type|data|command|depend|seed|path|time|size|bytes|format|repository|iteration|parent|children|seconds|warnings|error
-all_monopoly_compared|stem|2cde273ef0f35517|e6757ac834bc12c8|a6310d5a00a26aa6|-748088771||t19298.7418025991s|d5aa907601c7fdc4|2404|rds|local|vector|||59.948||
+all_monopoly_compared|stem|9b47ad3f8ab9dddd|e6757ac834bc12c8|a6310d5a00a26aa6|-748088771||t20001.6629491609s|4ca784784ba12c15|2298|rds|local|vector|||41.067||
 data|stem||26244b1686ce680e|f106617602eafdc3|1588979285||t19121.657678018s||0|file|local|vector|||0.001||could not find function read_tsv
-effect_length_vec_vs_df_plot|stem|e3222fc1bbbb6d22|9b006e0a7fb7f705|79e051a3a903be03|-1760052152||t19298.7418093587s|a1a52b33fe37167d|138477|rds|local|vector|||0.016||
+effect_length_vec_vs_df_plot|stem|96ba5e18ce0d255d|9b006e0a7fb7f705|8fda1f507cad4dac|-1760052152||t20001.6622853608s|cfb6f8d76bf2a89b|136617|rds|local|vector|||0.676||
 effect_of_vec_len|stem|4bc90ebedc4e1495|1a82dd5af5a142c9|2d02ef74377ae69d|-2018596587||t19103.5121393094s|fc5a7f730a6956f4|12061|qs|local|vector|||3677.227||
-effect_of_vec_len_df|stem|b3ad9924070ae293|af00d813a9a4231e|6c6346873d599cd0|-82591652||t19298.6765415401s|6433a5398d234304|7881|rds|local|vector|||100.615||
-effect_of_vec_len_parallel|stem|7c107aa19c612d3a|1a7f27bccbbe2e7c|5455f2a3c267b502|-712113560||t19298.7341682399s|b4397ccd9529042f|18936|qs|local|vector|||4978.693|UNRELIABLE VALUE Future none unexpectedly generated random numbers without specifying argument seed. There is a risk that those random numbers are not statistically sound and the overall results might be invalid. To fix this, specify seedTRUE. This ensures that proper, parallelsafe random numbers are produced via the LEcuyerCMRG method. To disable this check, use seedNULL, or set option future.rng.onMisuse to ignore.|
-effect_of_vec_len_plot|stem|b97d62aacb8d88f3|a184ebcff757d62a|5565a4df7ce6e24a|1157395129||t19298.741805377s|fd7d0688151b3172|191560|rds|local|vector|||0.019||
-effect_of_vec_len_vec|stem|581801e8369828e4|b27685c836130fc4|e5116cd63103ac17|1344698365||t19298.7409587147s|ba04ff37b4e4562e|6619|rds|local|vector|||3.141||
-if_else_comparisons|stem|3c06a333588a481d|badadf97fb0d7d9e|94fe591cc7df5d53|1445068235||t19298.7411085369s|a2299052983f3129|23862|rds|local|vector|||12.923||
-if_else_comparisons_plot|stem|13afcd05e439d5df|fa67362a8c5318ed|41100e1efaaa0271|-1554724336||t19298.7418104698s|6394dfd257678d16|146797|rds|local|vector|||0.009||
+effect_of_vec_len_df|stem|799471ad4d9baa63|af00d813a9a4231e|6c6346873d599cd0|-82591652||t20001.6262015017s|75484ca11389dd57|7562|rds|local|vector|||53.917||
+effect_of_vec_len_parallel|stem|e6bd9fb2def651b3|a6b7eda6dc0324ff|20d3b6514bead62a|-712113560||t20001.6594689095s|3a3306d29abee68c|18547|qs|local|vector|||1681.083||
+effect_of_vec_len_plot|stem|0d5a0f677ceb9af2|a184ebcff757d62a|a88ec2c2a82c944d|1157395129||t20001.6624490191s|0a238aa3f511b874|190796|rds|local|vector|||0.626||
+effect_of_vec_len_vec|stem|31809e226b4b5fbf|b27685c836130fc4|e5116cd63103ac17|1344698365||t20001.6622478143s|4bfcdb5aac9ffe73|6354|rds|local|vector|||2.31||
+fut_opts|object|98138731c664bd14|||||||||||||||
+if_else_comparisons|stem|dc9bf2ae812263de|badadf97fb0d7d9e|94fe591cc7df5d53|1445068235||t20001.6624144819s|0835ab0a84cb135a|22961|rds|local|vector|||8.898||
+if_else_comparisons_plot|stem|f7a7cf931c544272|fa67362a8c5318ed|a9cb805edb9dbf5c|-1554724336||t20001.6629816611s|419b5c84880269fd|143930|rds|local|vector|||0.493||
 move_square|function|8688444232cdf60c|||||||||||||||
 move_square_bad|function|6dfd8e8c17ebc86a|||||||||||||||
 move_square_better|function|679e6d192585afa4|||||||||||||||
 move_square_prob|function|e95c66bce1f08516|||||||||||||||
 move_square_Rcpp|function|b5e7085171126688|||||||||||||||
-object_creation|stem|6ed2983d8e2c5c69|465e26cba4e019bb|800c78396a098beb|1218185210||t19298.6765442717s|4fd82add577cbaa9|1397|rds|local|vector|||0.2||
-object_creation_plot|stem|22bbce688578da19|65cad5b7e3a07479|ac388be419d5c6ef|835019905||t19298.7418041269s|5a66a0431d03722f|94465|rds|local|vector|||0.051||
-parallel_overhead|stem|7a3542b55863bf10|0554921134884213|0e141a4cadb815df|-2066794221||t19298.7409222314s|a84e3a059ca8e251|1300|rds|local|vector|||246.463||
-parallel_overhead_plot|stem|5947b5a3ddc895b9|ae34a84173e188b7|4a73ea0d28f3d1be|-398343135||t19298.7418079234s|fc0d72ffd667d369|86128|rds|local|vector|||0.011||
+object_creation|stem|7ecb011608c1b746|465e26cba4e019bb|800c78396a098beb|1218185210||t20001.6262324278s|ec0a83125bfabd1f|1305|rds|local|vector|||0.558||
+object_creation_plot|stem|e78b1f7d9e51c2d7|65cad5b7e3a07479|c8a9c289974f71cb|835019905||t20001.6262693725s|9ed8eed19cd6ed71|94237|rds|local|vector|||0.486||
+parallel_overhead|stem|d2c705c1b8d90a20|b9c1f42b66b81643|83d51649b80e1e86|-2066794221||t20001.6621621194s|154d3de23c95490f|1267|rds|local|vector|||139.126||
+parallel_overhead_plot|stem|3b35d76d9ff7fee7|ae34a84173e188b7|ad6bee8bfe927ea7|-398343135||t20001.6621954066s|365089d2f6377620|86121|rds|local|vector|||0.51||
 params|stem|ca24d62bef80416f|45e7f14d6baac583|a3dad144c40657ed|890816472||t19121.6576778068s|1d635f53cb385f1d|65|rds|local|vector||params_fa0d73e4*params_30ed007e*params_c80b3682|0.001||
-partial_sort_plot|stem|92639c93c8b1ba78|0e58c2e8ded3349e|cedf6f13ceea2ae9|1594735659||t19298.7418069048s|c736d2073e9e89b5|120863|rds|local|vector|||0.046||
+partial_sort_plot|stem|f54dfb8eae7601eb|0e58c2e8ded3349e|b2ce75d5e6a7866e|1594735659||t20001.6605262304s|ed789c799097efb7|120151|rds|local|vector|||0.686||
 Rcpp_monopoly_fun_str|object|5de7b2d188ebe363|||||||||||||||
-sort_comparisons|stem|5d689ec7c441a28b|651acd8e062a0466|93158dcd3391847e|-2053969460||t19298.7380693588s|9eb1a43127a1d3f8|19089|rds|local|vector|||337.038|UNRELIABLE VALUE Future none unexpectedly generated random numbers without specifying argument seed. There is a risk that those random numbers are not statistically sound and the overall results might be invalid. To fix this, specify seedTRUE. This ensures that proper, parallelsafe random numbers are produced via the LEcuyerCMRG method. To disable this check, use seedNULL, or set option future.rng.onMisuse to ignore.|
+sort_comparisons|stem|33b18c4718b1e923|e375eb161f782184|5e02e250c00ea7bf|-2053969460||t20001.6604865542s|fa3caae4d2f7ef6f|18593|rds|local|vector|||84.942||
