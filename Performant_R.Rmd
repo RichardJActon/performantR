@@ -109,6 +109,8 @@ compiler::enableJIT(0)
 
 `git clone https://github.com/RichardJActon/performantR.git`
 
+Pre-configured cloud environment for exercises: [![launch - renku](https://renkulab.io/renku-badge.svg)](https://renkulab.io/projects/racton/performantR/sessions/new?autostart=1)
+
 ### Slides Directly
 
 [richardjacton.github.io/performantR/Performant_R.html](https://richardjacton.github.io/performantR/Performant_R.html)
