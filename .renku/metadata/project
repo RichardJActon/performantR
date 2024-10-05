@@ -1,9 +1,8 @@
 {
   "@renku_data_type": "renku.domain_model.project.Project",
   "@renku_oid": "project",
-  "agent_version": "1.8.1",
+  "agent_version": "2.9.2",
   "annotations": [],
-  "automated_update": true,
   "creator": {
     "@renku_data_type": "renku.domain_model.provenance.agent.Person",
     "@renku_data_value": {
@@ -20,14 +19,21 @@
   },
   "description": null,
   "id": "/projects/RichardJActon/performantr",
-  "immutable_template_files": [],
+  "image": null,
   "keywords": [],
-  "minimum_renku_version": "1.7.0",
+  "minimum_renku_version": "2.8.0",
   "name": "performantR",
-  "template_id": "bioc-minimal",
-  "template_metadata": "{\"__template_source__\": \"renku\", \"__template_ref__\": \"0.3.1\", \"__template_id__\": \"bioc-minimal\", \"__namespace__\": \"RichardJActon\", \"__sanitized_project_name__\": \"\", \"__repository__\": \"\", \"__project_slug__\": \"\", \"__project_description__\": null, \"__renku_version__\": \"1.8.1\", \"__name__\": \"performantR\", \"name\": \"performantR\", \"__template_version__\": \"0.3.1\", \"__automated_update__\": true}",
-  "template_ref": "0.3.1",
-  "template_source": "renku",
-  "template_version": "0.3.1",
-  "version": 9
+  "template_metadata": {
+    "@renku_data_type": "renku.domain_model.project.ProjectTemplateMetadata",
+    "@renku_data_value": {
+      "immutable_template_files": [],
+      "metadata": "{\"__template_source__\": \"renku\", \"__template_ref__\": \"0.3.1\", \"__template_id__\": \"bioc-minimal\", \"__namespace__\": \"RichardJActon\", \"__sanitized_project_name__\": \"\", \"__repository__\": \"\", \"__project_slug__\": \"\", \"__project_description__\": null, \"__renku_version__\": \"1.8.1\", \"__name__\": \"performantR\", \"name\": \"performantR\", \"__template_version__\": \"0.3.1\", \"__automated_update__\": true}",
+      "ssh_supported": false,
+      "template_id": "bioc-minimal",
+      "template_ref": "0.3.1",
+      "template_source": "renku",
+      "template_version": "0.3.1"
+    }
+  },
+  "version": "10"
 }
