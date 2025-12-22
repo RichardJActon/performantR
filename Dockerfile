@@ -1,6 +1,8 @@
 # see https://github.com/SwissDataScienceCenter/renkulab-docker
 # to swap this image for the latest version available
-FROM renku/renkulab-bioc:RELEASE_3_14-0.11.1
+ARG RENKU_BASE_IMAGE=renku/renkulab-r:4.2.0-86a96e9
+FROM ${RENKU_BASE_IMAGE}
+# FROM renku/renkulab-bioc:RELEASE_3_14-0.11.1
 
 # Uncomment and adapt if code is to be included in the image
 # COPY src /code/src
